@@ -1,0 +1,993 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shadowrun Sprite Colours</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a workbench. Map canvas fills the left, a fixed-width inspector + block catalogue on the right; stacks on phones.
+   Single dark look on purpose: map art is judged against black, like the game itself. */
+:root {
+  --bg: #0d0f14; --panel: #151922; --panel-2: #1c2130; --line: #2a3142; --fg: #e4e7ef; --muted: #8d95a8;
+  --accent: #ff4f9a; --accent-ink: #1a0610; --cyan: #3fd6e8; --green: #59e08a; --yellow: #f2c94c; --red: #ff6b5e;
+  --display: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--fg); font: 14px/1.45 var(--body); }
+.wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 14px 24px; display: flex; flex-direction: column; gap: 12px; min-height: 100%; box-sizing: border-box; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+h1 { font: 600 22px/1 var(--display); letter-spacing: .02em; margin: 0; }
+h1 span { color: var(--accent); }
+h2 { font: 600 13px/1.2 var(--display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.grow { flex: 1 1 auto; }
+button, .btn, select, input { font: inherit; color: var(--fg); }
+button, .btn { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 6px 11px; cursor: pointer; white-space: nowrap; }
+button:hover:not(:disabled), .btn:hover { border-color: var(--muted); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+button:focus-visible, input:focus-visible, select:focus-visible, .btn:focus-within { outline: 2px solid var(--cyan); outline-offset: 2px; }
+input[type="number"], input[type="search"], select { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; min-width: 0; }
+input[type="number"] { width: 5.5em; font-family: var(--mono); }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.toolbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 4px; }
+main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 12px; flex: 1 1 auto; min-height: 0; }
+@media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); } }
+.stage { background: #000; border: 1px solid var(--line); border-radius: 8px; overflow: auto; position: relative; min-height: 320px; max-height: calc(100vh - 170px); }
+.stage canvas { display: block; image-rendering: pixelated; }
+#over { position: absolute; left: 0; top: 0; }
+aside { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.field { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
+.meters { display: grid; grid-template-columns: auto 1fr auto; gap: 6px 10px; align-items: center; font-size: 12px; }
+.bar { height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--cyan); }
+.bar.warn i { background: var(--yellow); } .bar.over i { background: var(--red); }
+.cat { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; max-height: 420px; overflow-y: auto; padding-right: 2px; }
+.blk { background: #000; border: 1px solid var(--line); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; gap: 2px; align-items: stretch; cursor: pointer; text-align: left; }
+.blk canvas { width: 100%; aspect-ratio: 4 / 3; image-rendering: pixelated; }
+.blk span { font: 11px var(--mono); color: var(--muted); }
+.blk.used span { color: var(--accent); }
+.drop { border: 2px dashed var(--line); border-radius: 10px; padding: 20px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 24px; align-items: center; }
+@media (max-width: 760px) { .drop { grid-template-columns: minmax(0, 1fr); } }
+.drop.hot { border-color: var(--accent); }
+.drop img { width: 100%; border-radius: 6px; border: 1px solid var(--line); image-rendering: pixelated; }
+.drop ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; max-width: 60ch; }
+.drop p { margin: 0; max-width: 62ch; }
+.badge { font: 500 11px var(--mono); padding: 2px 6px; border-radius: 4px; background: var(--panel-2); border: 1px solid var(--line); }
+.badge.edit { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.msg { font-size: 13px; padding: 8px 10px; border-radius: 6px; background: var(--panel-2); border-left: 3px solid var(--cyan); }
+.msg.err { border-left-color: var(--red); } .msg.ok { border-left-color: var(--green); }
+.keys { font-size: 12px; color: var(--muted); display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; }
+kbd { font: 11px var(--mono); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; color: var(--fg); }
+#mapsel { max-width: 340px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+@media (prefers-reduced-motion: no-preference) { .bar i { transition: width .2s; } }
+
+.modes { display: flex; gap: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.modes button { border: 0; border-radius: 0; border-right: 1px solid var(--line); padding: 7px 14px; font-family: var(--display); font-weight: 600; letter-spacing: .03em; }
+.modes button:last-child { border-right: 0; }
+.modes button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.pal { display: grid; grid-template-columns: repeat(auto-fill, minmax(66px, 1fr)); gap: 4px; max-height: 360px; overflow-y: auto; }
+.pal button { padding: 3px; background: #000; display: flex; flex-direction: column; align-items: center; gap: 2px; font: 10px var(--mono); color: var(--muted); }
+.pal button canvas { width: 64px; height: 32px; image-rendering: pixelated; }
+.pal button[aria-pressed="true"] { outline: 2px solid var(--accent); background: #000; color: var(--accent); }
+.list { display: flex; flex-direction: column; gap: 2px; max-height: 300px; overflow-y: auto; }
+.list button { text-align: left; display: flex; gap: 8px; align-items: baseline; padding: 4px 8px; background: transparent; border-color: transparent; }
+.list button[aria-pressed="true"] { background: var(--panel-2); color: var(--fg); border-color: var(--accent); }
+.list button .mono { color: var(--muted); font-size: 12px; }
+.list button.off { opacity: .5; text-decoration: line-through; }
+.grid6 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.grid6 input { width: 100%; box-sizing: border-box; }
+select.wide { width: 100%; }
+
+.smain { display: grid; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: 12px; flex: 1 1 auto; min-height: 0; }
+@media (max-width: 860px) { .smain { grid-template-columns: minmax(0, 1fr); } }
+.slist { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; max-height: calc(100vh - 230px); min-height: 300px; }
+.slist button { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 8px; align-items: center; text-align: left; padding: 4px 8px; background: transparent; border-color: transparent; white-space: normal; }
+.slist button:hover { background: var(--panel-2); }
+.slist button[aria-pressed="true"] { background: var(--panel-2); border-color: var(--accent); color: var(--fg); }
+.slist canvas { width: 44px; height: 44px; image-rendering: pixelated; background: #000; border-radius: 4px; }
+.slist .t { font-size: 13px; } .slist .w { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+.slist .ed { color: var(--accent); font-weight: 600; }
+.stage2 { background: #22262f; border: 1px solid var(--line); border-radius: 8px; display: flex; align-items: center; justify-content: center; min-height: 200px; padding: 12px; overflow: auto; }
+.stage2 canvas { image-rendering: pixelated; }
+.sw { display: flex; flex-wrap: wrap; gap: 4px; }
+.sw button { width: 34px; height: 34px; padding: 0; border-radius: 6px; border: 2px solid var(--line); position: relative; }
+.sw button.chg { border-color: var(--accent); }
+.sw button span { position: absolute; bottom: 1px; right: 3px; font: 9px var(--mono); color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000; }
+.sw .zero { background: repeating-conic-gradient(#555 0 25%, #333 0 50%) 0 0 / 10px 10px; cursor: default; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chips button { padding: 4px 10px; font-size: 12px; border-radius: 999px; }
+.chips button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.facing { display: grid; grid-template-columns: repeat(4, auto); gap: 4px; }
+.facing button { padding: 3px 8px; font-size: 12px; }
+.muted.small { font-size: 12px; }
+.brushes button.sel { outline: 3px solid var(--accent); outline-offset: 1px; }
+#big { cursor: crosshair; touch-action: none; }
+.shared-list { font-size: 12px; color: var(--muted); max-height: 70px; overflow-y: auto; }
+</style>
+
+<div class="wrap">
+<header>
+  <h1>Shadowrun <span>Sprite Colours</span></h1>
+  <span class="muted" id="romname">No ROM loaded</span>
+  <span class="grow"></span>
+  <label class="btn" for="romfile">Open ROM…</label>
+  <input type="file" id="romfile" accept=".sfc,.smc,.bin" class="visually-hidden">
+  <label class="btn" for="projfile" id="projlabel" hidden>Load edits…</label>
+  <input type="file" id="projfile" accept=".json" class="visually-hidden">
+  <button id="saveproj" disabled>Save edits</button>
+  <button id="export" class="primary" disabled>Export patch</button>
+</header>
+
+<section id="welcome" class="drop" aria-label="Open a ROM">
+  <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+    <h2>Recolour and repaint any character</h2>
+    <p>Most characters in Shadowrun share their colours: Jake's palette is also used by 117 other sprites. This tool gives a character a palette of its own, so you can recolour Jake without recolouring half of Seattle. You can still change a shared palette for everyone when that is what you want.</p>
+    <ol>
+      <li>Open your Shadowrun (USA) ROM. Vanilla and Runner Pack ROMs both work. It stays in your browser.</li>
+      <li>Pick a character, click a colour swatch and choose a new colour. The preview animates in the new colours.</li>
+      <li>Or turn on <b>Paint pixels</b> and repaint the character's pixel art with its palette's colours.</li>
+      <li>Export: you get a .zip with the .ips patch for that ROM. Apply it after the Runner Pack.</li>
+    </ol>
+  </div>
+  <figure style="margin:0;display:flex;flex-direction:column;gap:6px;min-width:0">
+    <img alt="Jake in his original colours and with his own recoloured palette, in the game" src="data:image/png;base64,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">
+    <figcaption class="muted" style="font-size:12px">Jake with his own palette (right). The trash can, which shared his old palette, keeps its colours.</figcaption>
+  </figure>
+</section>
+
+<div id="app" hidden style="display:flex;flex-direction:column;gap:12px;flex:1 1 auto;min-height:0">
+  <div class="smain">
+    <div class="card" style="min-height:0">
+      <input type="search" id="q" placeholder="Search: Jake, Ghoul, $0B…" aria-label="Search sprites">
+      <div class="chips" role="group" aria-label="Filter"><button data-f="all" aria-pressed="true">All</button><button data-f="named" aria-pressed="false">Named</button><button data-f="edited" aria-pressed="false">Edited</button></div>
+      <div class="muted small" id="count"></div>
+      <div class="slist" id="list"></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+      <div class="card">
+        <div class="row"><h2 class="grow" id="sname">Sprite</h2><span class="badge mono" id="sid"></span></div>
+        <div class="stage2"><canvas id="pv" width="64" height="64"></canvas></div>
+        <div class="row">
+          <label class="field">Animation <select id="anim"></select></label>
+          <div class="field">Facing <div class="facing" id="facing"></div></div>
+          <button id="play" aria-pressed="true">Playing</button>
+          <span class="muted small" id="group"></span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="row"><h2 class="grow">Pixels</h2><button id="pixon" aria-pressed="false">Paint pixels</button></div>
+        <div class="muted small" id="pixintro">Repaint the character's pixel art with the colours of its palette: pencil, fill, colour picker (or right-click), copy and paste between frames (also mirrored, for the opposite facing), and a PNG round trip for drawing in another program.</div>
+        <div id="pixui" hidden style="display:flex;flex-direction:column;gap:10px">
+          <div class="row"><button id="fprev" aria-label="Previous frame">◀</button><span class="mono" id="fpos"></span><button id="fnext" aria-label="Next frame">▶</button><span class="grow"></span><button id="pundo" disabled>Undo</button><button id="preset">Reset this character's pixels</button></div>
+          <div class="row"><div class="chips" role="group" aria-label="Tool"><button data-tool="pen" aria-pressed="true">Pencil</button><button data-tool="fill" aria-pressed="false">Fill</button><button data-tool="pick" aria-pressed="false">Pick colour</button></div>
+            <span class="grow"></span><button id="fcopy">Copy frame</button><button id="fpaste" disabled>Paste</button><button id="fpastem" disabled>Paste mirrored</button></div>
+          <div class="sw brushes" id="brushes"></div>
+          <div class="row"><button id="pngout">Save frame as PNG</button><label class="btn" for="pngin">Load PNG into frame…</label><input type="file" id="pngin" accept=".png,image/png" class="visually-hidden"><span class="muted small" id="pngnote"></span></div>
+          <div class="stage2" style="justify-content:flex-start"><canvas id="big" width="16" height="16"></canvas></div>
+          <div class="muted small" id="pixnote"></div>
+        </div>
+      </div>
+      <div id="pals" style="display:flex;flex-direction:column;gap:12px"></div>
+      <div class="card">
+        <h2>Palette budget</h2>
+        <div class="meters" id="meters"></div>
+        <div class="muted small">The SNES shows 8 sprite palettes at once. The game uses up to 7 in busy scenes, so one own palette always fits; if a scene ever runs out, a character with its own palette falls back to its old shared colours instead of breaking the picture.</div>
+      </div>
+    </div>
+  </div>
+  <div id="status" class="msg" aria-live="polite">Ready.</div>
+  <input type="color" id="picker" class="visually-hidden" aria-label="Pick a colour">
+</div>
+</div>
+
+<script>// Shadowrun (SNES) text core: Huffman decode/encode with the game's own tree, text inventory, font preview,
+// and writing edited texts back (in place when they fit, otherwise into a pool with a redirect hook).
+// Format: text id < $C000 -> bytes at $9D:(id|$8000) (bank $9E when id bit 15 is set); bit stream MSB first.
+// Tree at $9D:8000: node = two words (bit 0 / bit 1); word bit 15 set = leaf with 1-2 chars (high byte first,
+// $00 = none); $0A ends the text. Decoder $80FE33/$80FE44 -> buffer $7E21A0 -> renderer $80FB03 (wraps by pixel
+// width, font $95:F2D0 8 bytes/char, widths $81:ABC8, '|' = emphasised word until the next space).
+// Expanded Dialogue: ids >= $C000 -> 3-byte pointers at $A0:8100 + 3*(id-$C000) (hook JML $A08000 at $80FE33).
+// Our hook: JML $B48000 at $80FE44 (the shared entry): looks the 24-bit pointer up in a table at $B4:8100
+// (word: end offset = 6*count, then [old ptr 3][new ptr 3] entries) and swaps it. Relocated texts live at $B5:8000+.
+(function (root) {
+'use strict';
+const L = a => ((a & 0x7F0000) >> 1) | (a & 0x7FFF);
+const MAXLEN = 250;           // decoded characters; vanilla max is 218, the buffer at $7E21A0 must not reach $7E2300
+const HOOK = 0xB48000, TABLE = 0xB48100, POOL_FIRST = 0xB5, POOL_LAST = 0xB7;
+
+function rb(u8, a) { return u8[L(a)]; }
+function rw(u8, a) { return u8[L(a)] | (u8[L(a + 1)] << 8); }
+
+class Texts {
+  constructor(u8) {
+    this.u8 = u8; this.leaves = []; this.codes = new Map();   // key "c1,c2" -> bit string
+    const walk = (x, code) => {
+      for (const b of [0, 1]) {
+        const w = rw(u8, 0x9D8000 + x + 2 * b);
+        if (w & 0x8000) { const c1 = (w >> 8) & 0x7F, c2 = w & 0x7F; this.leaves.push([c1, c2, code + b]); this.codes.set(c1 + ',' + c2, code + b); }
+        else walk(w, code + b);
+      }
+    };
+    walk(0, '');
+    this.single = new Set(this.leaves.filter(l => l[1] === 0).map(l => l[0]));
+    this.ed = rb(u8, 0x80FE33) === 0x5C && rw(u8, 0x80FE34) === 0x8000 && rb(u8, 0x80FE36) === 0xA0;
+    this.hooked = rb(u8, 0x80FE44) === 0x5C && rw(u8, 0x80FE45) === (HOOK & 0xFFFF) && rb(u8, 0x80FE47) === (HOOK >> 16);
+    this.redirects = new Map();   // original ptr -> pool ptr
+    if (this.hooked && u8.length >= 0x200000) {
+      const end = rw(u8, TABLE);
+      for (let o = 0; o < end && o < 0x7E00; o += 6) {
+        const a = rw(u8, TABLE + 2 + o) | (rb(u8, TABLE + 4 + o) << 16), b = rw(u8, TABLE + 5 + o) | (rb(u8, TABLE + 7 + o) << 16);
+        this.redirects.set(a, b);
+      }
+    }
+  }
+  basePtr(id) {
+    if (id >= 0xC000) { if (!this.ed) return null; const t = 0xA08100 + 3 * (id - 0xC000); return rw(this.u8, t) | (rb(this.u8, t + 2) << 16); }
+    return ((0x9D + (id & 0x8000 ? 1 : 0)) << 16) | (id | 0x8000);
+  }
+  ptr(id) { const b = this.basePtr(id); return b == null ? null : (this.redirects.get(b) || b); }
+  // decode at a 24-bit pointer -> {codes: [char codes], bytes: length in bytes}
+  decodeAt(p) {
+    const u8 = this.u8, out = []; let bit = 0;
+    const base = L(p);
+    for (let guard = 0; guard < 4000; guard++) {
+      let x = 0, w;
+      for (;;) {
+        if ((u8[base + (bit >> 3)] >> (7 - (bit & 7))) & 1) x += 2;
+        bit++; w = u8[0xE8000 + x] | (u8[0xE8001 + x] << 8);
+        if (w & 0x8000) break; x = w;
+        if (x > 0x2000) return null;
+      }
+      const c1 = (w >> 8) & 0x7F, c2 = w & 0x7F;
+      if (c1 === 0x0A) return { codes: out, bytes: (bit + 7) >> 3 };
+      out.push(c1);
+      if (c2) { if (c2 === 0x0A) return { codes: out, bytes: (bit + 7) >> 3 }; out.push(c2); }
+    }
+    return null;
+  }
+  decode(id) { const p = this.ptr(id); return p == null ? null : this.decodeAt(p); }
+  // optimal encoding with the fixed tree (1- and 2-char leaves), ending with a leaf that holds $0A
+  encode(codes) {
+    const n = codes.length, INF = 1e9, best = new Array(n + 1).fill(INF), from = new Array(n + 1);
+    best[0] = 0;
+    for (let i = 0; i < n; i++) {
+      if (best[i] >= INF) continue;
+      const one = this.codes.get(codes[i] + ',0');
+      if (one && best[i] + one.length < best[i + 1]) { best[i + 1] = best[i] + one.length; from[i + 1] = [i, one]; }
+      if (i + 1 < n) { const two = this.codes.get(codes[i] + ',' + codes[i + 1]); if (two && best[i] + two.length < best[i + 2]) { best[i + 2] = best[i] + two.length; from[i + 2] = [i, two]; } }
+    }
+    // terminator: (0A,0) after everything, or (c,0A) covering the last char
+    let endBits = null, endBest = INF;
+    const t1 = this.codes.get('10,0');
+    if (t1 && best[n] < INF) { endBest = best[n] + t1.length; endBits = { at: n, code: t1 }; }
+    if (n > 0 && best[n - 1] < INF) { const t2 = this.codes.get(codes[n - 1] + ',10'); if (t2 && best[n - 1] + t2.length < endBest) { endBest = best[n - 1] + t2.length; endBits = { at: n - 1, code: t2 }; } }
+    if (!endBits) throw new Error('cannot encode');
+    const parts = [endBits.code]; let i = endBits.at;
+    while (i > 0) { if (!from[i]) throw new Error('character not in the game font: ' + codes[i - 1]); parts.push(from[i][1]); i = from[i][0]; }
+    const bits = parts.reverse().join('');
+    const out = new Uint8Array((bits.length + 7) >> 3);
+    for (let k = 0; k < bits.length; k++) if (bits[k] === '1') out[k >> 3] |= 0x80 >> (k & 7);
+    return out;
+  }
+  canEncode(code) { return this.single.has(code); }
+  // ---- inventory: every text the game points at, with where it is used
+  inventory(meta) {
+    const u8 = this.u8, list = new Map();
+    const add = (id, g, label) => { if (!id || id === 0xFFFF) return; if (id >= 0xC000 && !this.ed) return;
+      let e = list.get(id); if (!e) { e = { id, g, l: [] }; list.set(id, e); } if (!e.l.includes(label)) e.l.push(label);
+      const order = ['conv', 'msg', 'menu', 'kw', 'name', 'other']; if (order.indexOf(g) < order.indexOf(e.g)) e.g = g; };
+    const kwName = k => { const d = this.decode(rw(u8, 0x8D8000 + 2 * k)); return d ? String.fromCharCode(...d.codes).replace(/\|/g, '') : '#' + k; };
+    const topic = (t, kws) => ({ 0xFF: 'greeting', 0xFE: 'Talk', 0xFD: 'default answer' }[t] || ('keyword "' + (t < 64 ? kwName(t) : '#' + t) + '"')) + (kws.length ? ' (needs ' + kws.map(k => '"' + kwName(k) + '"').join(', ') + ')' : '');
+    for (let n = 0; n < (meta.nconv || 139); n++) {
+      const base = 0x8D0000 | rw(u8, 0x80947A + 2 * n); let y = 4;
+      const ppl = (meta.conv_people[n] || []).join(', ') || 'conversation ' + n;
+      for (let k = 0; k < 80; k++) {
+        const t = rb(u8, base + y); if (t === 0xF8) break;
+        const ln = rb(u8, base + y + 1), fl = rb(u8, base + y + 2), nk = fl & 15, kws = [];
+        for (let i = 0; i < nk; i++) kws.push(rb(u8, base + y + 3 + i));
+        let q = base + y + 3 + nk; if (fl & 0x80) q += 2;
+        const tid = rw(u8, q);
+        add(tid, 'conv', ppl + ' · ' + topic(t, kws) + (tid >= 0xC000 ? ' (Expanded Dialogue)' : ''));
+        if (!ln) break; y += 1 + ln;
+      }
+    }
+    for (let i = 0; i < 0x264; i++) { const u = meta.msg_users[i] || [], mid = rw(u8, 0x80D980 + 2 * i); add(mid, 'msg', 'Message ' + i + (u.length ? ': ' + u.slice(0, 3).join('; ') + (u.length > 3 ? ' +' + (u.length - 3) + ' more' : '') : ' (engine or menus)'));  const me = list.get(mid); if (me && !(me.msg = me.msg || []).includes(i)) me.msg.push(i); }
+    for (let k = 0; k < 64; k++) add(rw(u8, 0x8D8000 + 2 * k), 'kw', 'Keyword ' + k);
+    for (let s = 0; s < 0x113; s++) add(rw(u8, 0x8CEFB0 + 6 * s), 'name', 'Hover name of sprite $' + s.toString(16).toUpperCase().padStart(2, '0'));
+    for (let i = 0; i < 13; i++) add(rw(u8, 0x809705 + 2 * i), 'name', 'Runner name ' + i);
+    for (const [hid, wins] of Object.entries(meta.eng_win || {})) { const ws = wins.map(w => w[0] + '×' + w[1]); add(parseInt(hid, 16), 'menu', 'Game menu or screen, window ' + [...new Set(ws)].slice(0, 3).join(', ') + ' tiles'); }
+    for (const id of meta.other || []) if (!(meta.eng_win || {})[id.toString(16).toUpperCase().padStart(4, '0')]) add(id, 'other', 'Not referenced by anything known (may be unused)');
+    const out = [];
+    for (const e of list.values()) { const d = this.decode(e.id); if (d && d.codes.length <= 1500) { e.codes = d.codes; e.bytes = d.bytes; e.ptr = this.ptr(e.id); e.base = this.basePtr(e.id); out.push(e); } }
+    out.sort((a, b) => a.id - b.id);
+    return out;
+  }
+}
+
+// ---- string <-> codes. Printable ASCII as is; other glyphs as {XX} (hex code).
+function toCodes(s) {
+  const out = []; let i = 0;
+  while (i < s.length) {
+    const m = /^\{([0-9A-Fa-f]{2})\}/.exec(s.slice(i));
+    if (m) { out.push(parseInt(m[1], 16)); i += 4; continue; }
+    const ch = s[i]; i++;
+    if (ch === '\n' || ch === '\r') { out.push(32); continue; }
+    out.push(ch.charCodeAt(0));
+  }
+  return out;
+}
+function fromCodes(codes) { return codes.map(c => (c >= 32 && c < 127 && c !== 123 && c !== 125) ? String.fromCharCode(c) : '{' + c.toString(16).toUpperCase().padStart(2, '0') + '}').join(''); }
+
+// ---- writing
+function hookCode() {
+  const b = [], lab = {}, fix = [];
+  const emit = (...x) => b.push(...x), here = () => b.length;
+  const long = (op, a) => emit(op, a & 0xFF, (a >> 8) & 0xFF, a >> 16);
+  const br = (op, name) => { emit(op, 0); fix.push([b.length - 1, name]); };
+  emit(0x08, 0xC2, 0x30, 0x48, 0xDA, 0xA2, 0x00, 0x00);          // php; rep #$30; pha; phx; ldx #0
+  lab.loop = here(); emit(0x8A); long(0xCF, TABLE); br(0xB0, 'done'); // txa; cmp.l TABLE; bcs done
+  long(0xBF, TABLE + 2); emit(0xC5, 0xCF); br(0xD0, 'next');         // lda.l TABLE+2,x; cmp $CF; bne next
+  long(0xBF, TABLE + 3); emit(0xC5, 0xD0); br(0xD0, 'next');         // lda.l TABLE+3,x; cmp $D0; bne next
+  long(0xBF, TABLE + 5); emit(0x85, 0xCF);                           // lda.l TABLE+5,x; sta $CF
+  long(0xBF, TABLE + 6); emit(0x85, 0xD0); br(0x80, 'done');         // lda.l TABLE+6,x; sta $D0; bra done
+  lab.next = here(); emit(0x8A, 0x18, 0x69, 0x06, 0x00, 0xAA); br(0x80, 'loop');
+  lab.done = here(); emit(0xFA, 0x68, 0x28, 0xF4, 0x7E, 0x7E, 0xAB); long(0x5C, 0x80FE48); // plx; pla; plp; pea $7E7E; plb; jml $80FE48
+  for (const [at, name] of fix) { const d = lab[name] - (at + 1); if (d < -128 || d > 127) throw new Error('branch'); b[at] = d & 0xFF; }
+  return Uint8Array.from(b);
+}
+// edits: Map(id -> codes). inv: inventory (for slot sizes). Returns {rom, report}
+function applyTextEdits(romU8, inv, edits) {
+  let out = new Uint8Array(romU8); const T = new Texts(out), report = [];
+  // spans of every known text at its BASE pointer, to know how much room each one has in place
+  const spans = [];
+  for (const e of inv) { if (e.base == null) continue; const d = T.decodeAt(e.base); if (d) spans.push([e.base, e.base + d.bytes, e.id]); }
+  spans.sort((a, b) => a[0] - b[0]);
+  const roomAt = base => {               // bytes free from base until the next text starts; 0 if base is inside another text
+    let room = Infinity;
+    for (const [s, e] of spans) {
+      if (s < base && e > base) return 0;
+      if (s > base && (s >> 16) === (base >> 16)) { room = Math.min(room, s - base); }
+    }
+    if (room === Infinity) { const d = T.decodeAt(base); room = d ? d.bytes : 0; }
+    return room;
+  };
+  const pool = new Map();    // base ptr -> bytes (texts that must live in the pool)
+  for (const [base, p] of T.redirects) {                    // keep earlier relocations that are not edited now
+    const id = inv.find(e => e.base === base); if (id && edits.has(id.id)) continue;
+    const d = T.decodeAt(p); if (d) pool.set(base, out.slice(L(p), L(p) + d.bytes));
+  }
+  for (const [id, codes] of edits) {
+    if (codes.length > MAXLEN) throw new Error('text $' + id.toString(16) + ' is longer than ' + MAXLEN + ' characters');
+    const base = T.basePtr(id); if (base == null) throw new Error('unknown text id ' + id);
+    const enc = T.encode(codes), room = roomAt(base);
+    if (enc.length <= room) { out.set(enc, L(base)); pool.delete(base); report.push({ id, where: 'in place', size: enc.length, room }); }
+    else { pool.set(base, enc); report.push({ id, where: 'moved', size: enc.length, room }); }
+  }
+  if (pool.size || T.hooked) {
+    if (out.length < 0x200000) { const big = new Uint8Array(0x200000); big.set(out); out = big; out[0x7FD7] = 0x0B; }
+    // hook + table + pool, rebuilt from scratch
+    for (let bk = POOL_FIRST; bk <= POOL_LAST; bk++) out.fill(0, L((bk << 16) | 0x8000), L((bk << 16) | 0x8000) + 0x8000);
+    out.fill(0, L(HOOK), L(HOOK) + 0x8000);
+    out.set(hookCode(), L(HOOK));
+    let bank = POOL_FIRST, addr = 0x8000, o = 0;
+    const entries = [...pool].sort((a, b) => a[0] - b[0]);
+    if (entries.length * 6 + 2 > 0x7E00) throw new Error('too many moved texts');
+    for (const [base, bytes] of entries) {
+      if (addr + bytes.length + 2 > 0x10000) { bank++; addr = 0x8000; }
+      if (bank > POOL_LAST) throw new Error('text pool full');
+      const p = (bank << 16) | addr; out.set(bytes, L(p)); addr += bytes.length + 1;   // +1: the decoder reads words
+      const t = L(TABLE + 2 + o); out[t] = base & 0xFF; out[t + 1] = (base >> 8) & 0xFF; out[t + 2] = base >> 16; out[t + 3] = p & 0xFF; out[t + 4] = (p >> 8) & 0xFF; out[t + 5] = p >> 16;
+      o += 6;
+      const r = report.find(x => x.where === 'moved' && T.basePtr(x.id) === base); if (r) r.addr = p;
+    }
+    out[L(TABLE)] = o & 0xFF; out[L(TABLE) + 1] = o >> 8;
+    out[L(0x80FE44)] = 0x5C; out[L(0x80FE45)] = HOOK & 0xFF; out[L(0x80FE46)] = (HOOK >> 8) & 0xFF; out[L(0x80FE47)] = HOOK >> 16;
+  }
+  return { rom: out, report };
+}
+
+// ---- font preview: glyph rows for char code c (8 rows, 1bpp, MSB = left) and width in pixels
+function glyph(u8, c) { const rows = []; for (let y = 0; y < 8; y++) rows.push(u8[L(0x95F2D0 + c * 8 + y)]); return { rows, w: u8[L(0x81ABC8 + c)] }; }
+
+const api = { Texts, toCodes, fromCodes, applyTextEdits, glyph, hookCode, MAXLEN };
+if (typeof module !== 'undefined') module.exports = api; else root.ST = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>// Shadowrun (SNES) sprites in the browser: decode animations/frames (port of srgfx.py) and recolour palettes,
+// either shared (every sprite using that palette id) or as a sprite's own palette (srpal.py: extra ids 70-109 in
+// bank $AF with hooks at $80AA97, $81A8D1, $81A8E1 and the Runner Pack sprite cache).
+(function (root) {
+'use strict';
+const L = a => ((a & 0x7F0000) >> 1) | (a & 0x7FFF);
+const BASE_ID = 70, MAX_EXTRA = 40, SIG = 0xAF8000, COUNT = 0xAF8006, ORIG = 0xAF8010, CORE = 0xAF8100, CLEAR = 0xAF8180, NMI = 0xAF8200, DATA = 0xAF9000;
+const CODE = {"core": "c94600b0250aaabd02181019adf017c91000b0129d0218866baaa56b9df2178ae8e88ef0176ba90e006bc96e00b0d60aaabfa4c57f10eeadf017c90e00b0139fa4c57f866baaa56b9df2178ae8e88ef0176b8a4aaabfca7faf29ff0080a7", "entry_after_core": 94, "clear": "8d8c18daa24e009f30c67fcaca10f8fa6b", "nmi": "b9f217c98c00b0110a0a0a0a1869ccf18d4243e220a98d801338e98c000a0a0a0a186902908d4243e220a9af8d4443c220a91e008d4543e220980a0a0a1869818d2121a9108d0b42c2206b"};
+const hexb = h => Uint8Array.from(h.match(/../g).map(x => parseInt(x, 16)));
+
+class Sprites {
+  constructor(u8) { this.u8 = u8; this._rec = null; this.n = 0x113; }
+  b(a) { return this.u8[L(a)]; }
+  w(a) { return this.u8[L(a)] | (this.u8[L(a + 1)] << 8); }
+  table(s) { return this.w(0x8CED8A + 2 * s); }
+  records() {
+    if (this._rec) return this._rec;
+    const r = new Set();
+    for (let sp = 0; sp < this.n; sp++) { const T = this.table(sp), first = this.w(0x8C0000 | T), n = (first - T) >> 1;
+      if (n > 0 && n < 40) { r.add(T); for (let k = 0; k < n; k++) r.add(this.w(0x8C0000 | ((T + 2 * k) & 0xFFFF))); } }
+    return (this._rec = [...r].sort((a, b) => a - b));
+  }
+  validFrame(w) {
+    const p = ((w & 0x8000 ? 0x9C : 0x9B) << 16) | w | 0x8000, n = this.b(p);
+    if (!(n > 0 && n <= 24)) return false;
+    const h = p + 1 + 4 * n, c = this.b(h + 2) & 15, r = this.b(h + 2) >> 4; return c > 0 && c <= 8 && r > 0 && r <= 8;
+  }
+  animations(s) {
+    const T = this.table(s), first = this.w(0x8C0000 | T), n = (first - T) >> 1; if (!(n > 0 && n < 40)) return [];
+    const recs = this.records(), out = [];
+    for (let k = 0; k < n; k++) {
+      const A = this.w(0x8C0000 | ((T + 2 * k) & 0xFFFF)), idx = []; for (let i = 8; i < 16; i++) idx.push(this.b(0x8C0000 | (A + i)));
+      if (idx.some(i => i % 2 || i > 240 || (i > 0 && i < 8)) || !idx.some(Boolean)) continue;
+      const nxt = Math.min(...recs.filter(r => r > A), A + 256), facings = [];
+      for (let f = 0; f < 8; f++) {
+        if (!idx[f]) { facings.push([]); continue; }
+        const later = idx.filter(i => i > idx[f]), end = later.length ? Math.min(...later) : (nxt - A - 8), ws = [];
+        for (let j = 0; j < Math.max(1, (end - idx[f]) >> 1); j++) { const w = this.w(0x8C0000 | ((A + 8 + idx[f] + 2 * j) & 0xFFFF)); if (!this.validFrame(w)) break; ws.push(w); if (ws.length >= 24) break; }
+        facings.push(ws);
+      }
+      out.push({ index: k, record: 0x8C0000 | A, palette: this.b(0x8C0000 | (A + 2)), delay: this.b(0x8C0000 | (A + 1)), facings });
+    }
+    return out;
+  }
+  tile(o) {   // 8x8 4bpp SNES tile at file offset o -> 64 indices
+    const u = this.u8, img = new Uint8Array(64);
+    for (let y = 0; y < 8; y++) for (let p = 0; p < 4; p++) { const byte = u[o + ((p >> 1) * 16) + y * 2 + (p & 1)]; for (let x = 0; x < 8; x++) img[y * 8 + x] |= ((byte >> (7 - x)) & 1) << p; }
+    return img;
+  }
+  stripAddr(wd) { return L(((0x8E + (wd & 0x3F)) << 16) | (wd & 0xFFC0) | 0x8000); }
+  cellPixels(top, bot) {   // 16x16 indices of a graphics cell (two 16x8 strips of two 8x8 tiles), unflipped
+    const cell = new Uint8Array(256);
+    for (const [half, wd] of [[0, top], [1, bot]]) {
+      const o = this.stripAddr(wd), t0 = this.tile(o), t1 = this.tile(o + 32);
+      for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { cell[(half * 8 + y) * 16 + x] = t0[y * 8 + x]; cell[(half * 8 + y) * 16 + 8 + x] = t1[y * 8 + x]; }
+    }
+    return cell;
+  }
+  // ov: optional Map('top,bot' -> Uint8Array(256)) of repainted cells
+  frame(word, ov) {  // -> {w, h, px: Int16Array (-1 transparent), ox, oy, cells: [{x, y, key, hf, vf}]}
+    const p = ((word & 0x8000 ? 0x9C : 0x9B) << 16) | word | 0x8000, n = this.b(p), words = [];
+    for (let i = 0; i < 2 * n; i++) words.push(this.w(p + 1 + 2 * i));
+    const h = p + 1 + 4 * n, cols = this.b(h + 2) & 15, rows = this.b(h + 2) >> 4, W = cols * 16, H = rows * 16;
+    const px = new Int16Array(W * H).fill(-1), cells = []; let k = 0;
+    for (let c = 0; c < cols; c++) for (let r = 0; r < rows; r++) {
+      const cb = this.b(h + 3 + c * rows + r); if (cb & 0x20 || k + 1 > words.length) continue;
+      const key = words[k] + ',' + words[k + 1], cell = ov && ov.has(key) ? ov.get(key) : this.cellPixels(words[k], words[k + 1]);
+      cells.push({ x: c * 16, y: r * 16, key, hf: !!(cb & 0x40), vf: !!(cb & 0x80) });
+      k += 2;
+      for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+        const sx = cb & 0x40 ? 15 - x : x, sy = cb & 0x80 ? 15 - y : y, v = cell[sy * 16 + sx];
+        if (v) px[(r * 16 + y) * W + c * 16 + x] = v;
+      }
+    }
+    return { w: W, h: H, px, ox: this.b(h), oy: this.b(h + 1), cells, rec: p, words };
+  }
+  // every cell's strips -> the sprites that use them (to know when a repainted strip must be copied)
+  stripUsers() {
+    if (this._users) return this._users;
+    const users = new Map(), recs = new Map();
+    for (let sp = 0; sp < this.n; sp++) for (const a of this.animations(sp)) for (const f of a.facings) for (const w of f) {
+      let fr; try { fr = this.frame(w); } catch (e) { continue; }
+      if (!recs.has(fr.rec)) recs.set(fr.rec, new Set()); recs.get(fr.rec).add(sp);
+      for (const c of fr.cells) for (const wd of c.key.split(',').map(Number)) { if (!users.has(wd)) users.set(wd, new Set()); users.get(wd).add(sp + '|' + c.key); }
+    }
+    return (this._users = { users, recs });
+  }
+  palAddr(pid) { return pid >= BASE_ID ? L(DATA + 32 * (pid - BASE_ID)) : L(0x8DF1CA + 32 * pid); }
+  palette(pid) { const a = this.palAddr(pid), out = []; for (let i = 0; i < 16; i++) out.push(this.u8[a + 2 * i] | (this.u8[a + 2 * i + 1] << 8)); return out; }
+  palettesOf(s) { const ps = []; for (const a of this.animations(s)) if (!ps.includes(a.palette)) ps.push(a.palette); return ps; }
+  group(s) { const T = this.table(s), g = []; for (let o = 0; o < this.n; o++) if (this.table(o) === T) g.push(o); return g; }
+  installed() { return this.u8.length >= 0x200000 && String.fromCharCode(...this.u8.slice(L(SIG), L(SIG) + 5)) === 'SRPAL'; }
+  extraCount() { return this.installed() ? this.w(COUNT) : 0; }
+}
+const rgb = c => [(c & 31) << 3, ((c >> 5) & 31) << 3, ((c >> 10) & 31) << 3];
+const snes = (r, g, b) => (r >> 3) | ((g >> 3) << 5) | ((b >> 3) << 10);
+
+function install(out) {
+  const S = new Sprites(out), put = (a, bytes) => out.set(bytes, L(a));
+  if (!S.installed()) {
+    const v = (a, n) => Array.from(out.slice(L(a), L(a) + n)).map(x => x.toString(16).padStart(2, '0')).join('');
+    if (v(0x80AA97, 5) !== '0aaabd0218' || v(0x81A8D1, 4) !== '8d8c186b' || v(0x81A8E1, 3) !== 'b9f217') throw new Error('This ROM has unexpected code where the palette hook goes.');
+    put(SIG, [0x53, 0x52, 0x50, 0x41, 0x4C, 1]); put(COUNT, [0, 0]);
+  }
+  const core = hexb(CODE.core), ent = CORE + core.length;
+  put(CORE, core); put(ent, [0x22, CORE & 0xFF, (CORE >> 8) & 0xFF, CORE >> 16, 0x5C, 0xB2, 0xAA, 0x80]);
+  put(CLEAR, hexb(CODE.clear)); put(NMI, hexb(CODE.nmi));
+  put(0x80AA97, [0x5C, ent & 0xFF, (ent >> 8) & 0xFF, ent >> 16]);
+  put(0x81A8D1, [0x5C, CLEAR & 0xFF, (CLEAR >> 8) & 0xFF, CLEAR >> 16]);
+  const body = new Uint8Array(0x81A90B - 0x81A8E1).fill(0xEA); body.set([0x22, NMI & 0xFF, (NMI >> 8) & 0xFF, NMI >> 16]); put(0x81A8E1, body);
+  // Runner Pack sprite cache: inline copy of $80AA97 -> JSL core
+  const pat = [0xB9, 0x64, 0x12, 0x0A, 0xAA, 0xBD, 0x02, 0x18];
+  for (let i = 0x100000; i + 30 < out.length; i++) {
+    let ok = true; for (let j = 0; j < 8; j++) if (out[i + j] !== pat[j]) { ok = false; break; }
+    if (ok && out[i + 8] === 0x10 && out[i + 27] === 0x8E && out[i + 28] === 0xF0 && out[i + 29] === 0x17) {
+      const rep = new Uint8Array(30).fill(0xEA); rep.set([0xB9, 0x64, 0x12, 0x22, CORE & 0xFF, (CORE >> 8) & 0xFF, CORE >> 16]); out.set(rep, i);
+    }
+  }
+}
+// edits: {shared: Map(pid -> colours[16]), own: Map(sprite -> Map(pid -> colours[16]))}
+function apply(romU8, edits) {
+  let out = new Uint8Array(romU8); const report = [];
+  const S0 = new Sprites(romU8);
+  for (const [pid, cols] of edits.shared) { const a = S0.palAddr(pid); cols.forEach((c, i) => { if (i) { out[a + 2 * i] = c & 0xFF; out[a + 2 * i + 1] = c >> 8; } }); report.push({ shared: pid }); }
+  if (edits.own.size) {
+    if (out.length < 0x200000) { const big = new Uint8Array(0x200000); big.set(out); out = big; out[0x7FD7] = 0x0B; }
+    install(out);
+    const S = new Sprites(out);
+    for (const [s, pals] of edits.own) {
+      const group = S0.group(s);
+      for (const [pid, cols] of pals) {
+        // already an extra palette used only by this group? then just recolour it
+        const users = []; for (let o = 0; o < S0.n; o++) if (!group.includes(o) && S0.palettesOf(o).includes(pid)) users.push(o);
+        let target = pid;
+        if (pid < BASE_ID || users.length) {
+          const n = S.w(COUNT); if (n >= MAX_EXTRA) throw new Error('All ' + MAX_EXTRA + ' extra palettes are in use.');
+          target = BASE_ID + n; out[L(ORIG + n)] = pid < BASE_ID ? pid : out[L(ORIG + pid - BASE_ID)];
+          out[L(COUNT)] = (n + 1) & 0xFF; out[L(COUNT) + 1] = (n + 1) >> 8;
+          const recs = new Set(); for (const a of S0.animations(s)) if (a.palette === pid) recs.add(a.record);
+          for (const r of recs) out[L(r + 2)] = target;
+        }
+        const a = S.palAddr(target); cols.forEach((c, i) => { out[a + 2 * i] = c & 0xFF; out[a + 2 * i + 1] = c >> 8; });
+        report.push({ sprite: s, from: pid, to: target, group });
+      }
+    }
+  }
+  if (edits.pixels && edits.pixels.size) {
+    if (out.length < 0x200000) { const big = new Uint8Array(0x200000); big.set(out); out = big; out[0x7FD7] = 0x0B; }
+    applyPixels(out, S0, edits.pixels, report);
+  }
+  return { rom: out, report };
+}
+// ---- repainted pixels. Strips used only by this sprite group's cell are rewritten in place; shared strips get a
+// copy in the pool $BC:8000-$BD:FFFF ('SRSPR' + 16-bit count, strips of 64 bytes from $BC:8040; same format as
+// srsprite.py) and this group's frame records are repointed to it.
+const POOL = 0xBC8000, POOL_END = 0xBDFFFF;
+function encodeTile(px, x0, y0) {   // 8x8 from a 16-wide index array -> 32 bytes 4bpp
+  const b = new Uint8Array(32);
+  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { const v = px[(y0 + y) * 16 + x0 + x], m = 0x80 >> x;
+    if (v & 1) b[y * 2] |= m; if (v & 2) b[y * 2 + 1] |= m; if (v & 4) b[16 + y * 2] |= m; if (v & 8) b[16 + y * 2 + 1] |= m; }
+  return b;
+}
+function allocStrip(out) {
+  const p = L(POOL), sig = [0x53, 0x52, 0x53, 0x50, 0x52];
+  if (!sig.every((c, i) => out[p + i] === c)) {
+    for (let i = p; i <= L(POOL_END); i++) if (out[i]) throw new Error('$BC:8000-$BD:FFFF is not empty in this ROM, so there is no room for copied graphics.');
+    out.set(sig, p); out[p + 5] = 0; out[p + 6] = 0;
+  }
+  const n = out[p + 5] | (out[p + 6] << 8), off = p + 0x40 + 64 * n;
+  if (off + 64 > L(POOL_END) + 1) throw new Error('The sprite graphics pool is full.');
+  out[p + 5] = (n + 1) & 0xFF; out[p + 6] = (n + 1) >> 8;
+  const snesA = 0x800000 | ((off >> 15) << 16) | 0x8000 | (off & 0x7FFF);
+  return (snesA & 0xFFC0) | (((snesA >> 16) - 0x8E) & 0x3F);
+}
+function applyPixels(out, S0, pix, report) {
+  const { users, recs } = S0.stripUsers();
+  for (const [s, cells] of pix) {
+    const group = S0.group(s), remap = new Map(); let copied = 0, inPlace = 0;
+    for (const [key, idx] of cells) {
+      const [top, bot] = key.split(',').map(Number), orig = S0.cellPixels(top, bot);
+      if (idx.every((v, i) => v === orig[i])) continue;
+      const nk = [top, bot];
+      [[top, 0], [bot, 8]].forEach(([wd, y0], h) => {
+        const data = new Uint8Array(64); data.set(encodeTile(idx, 0, y0), 0); data.set(encodeTile(idx, 8, y0), 32);
+        const mine = [...(users.get(wd) || [])].every(u => { const [sp, k] = u.split('|'); return group.includes(+sp) && k === key; });
+        if (mine) { out.set(data, S0.stripAddr(wd)); inPlace++; }
+        else { const nw = allocStrip(out); out.set(data, S0.stripAddr(nw)); nk[h] = nw; copied++; }
+      });
+      if (nk[0] !== top || nk[1] !== bot) remap.set(key, nk);
+    }
+    const others = new Set();
+    if (remap.size) {
+      const seen = new Set();
+      for (const a of S0.animations(s)) for (const f of a.facings) for (const w of f) {
+        const fr = S0.frame(w); if (seen.has(fr.rec)) continue; seen.add(fr.rec);
+        for (let i = 0; i + 1 < fr.words.length; i += 2) {
+          const nk = remap.get(fr.words[i] + ',' + fr.words[i + 1]); if (!nk) continue;
+          const o = L(fr.rec + 1 + 2 * i); out[o] = nk[0] & 0xFF; out[o + 1] = nk[0] >> 8; out[o + 2] = nk[1] & 0xFF; out[o + 3] = nk[1] >> 8;
+          for (const sp of recs.get(fr.rec) || []) if (!group.includes(sp)) others.add(sp);
+        }
+      }
+    }
+    report.push({ sprite: s, pixels: true, cells: cells.size, inPlace, copied, others: [...others] });
+  }
+}
+const api = { Sprites, apply, install, rgb, snes, BASE_ID, MAX_EXTRA };
+if (typeof module !== 'undefined') module.exports = api; else root.SP = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const hex = (n, w = 2) => n.toString(16).toUpperCase().padStart(w, '0');
+const fmtCrc = c => c.toString(16).toUpperCase().padStart(8, '0');
+const crc32 = u8 => { let c, crc = 0xFFFFFFFF; const T = crc32.T || (crc32.T = Array.from({ length: 256 }, (_, n) => { c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; })); for (let i = 0; i < u8.length; i++) crc = T[(crc ^ u8[i]) & 0xFF] ^ (crc >>> 8); return (crc ^ 0xFFFFFFFF) >>> 0; };
+const FACE = ['S', 'SW', 'W', 'NW', 'N', 'NE', 'E', 'SE'];
+let romU8 = null, S = null, romName = '', romCrc = 0, names = [], info = [], cur = null, filter = 'all';
+let anims = [], animI = 0, faceI = 0, frameI = 0, playing = true, tick = 0;
+const shared = new Map();      // pid -> colours[16]
+const own = new Map();         // leader sprite -> Map(pid -> colours[16])
+const pix = new Map();         // leader sprite -> Map('top,bot' strip words -> Uint8Array(256) repainted cell)
+let painting = false, brush = 1, undoStack = [];
+function status(text, kind) { const s = $('status'); s.textContent = text; s.className = 'msg' + (kind ? ' ' + kind : ''); }
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+
+async function loadRom(file) {
+  let u8 = new Uint8Array(await file.arrayBuffer());
+  if (u8.length % 0x8000 === 512) u8 = u8.slice(512);
+  const title = String.fromCharCode(...u8.slice(0x7FC0, 0x7FC9));
+  if (title !== 'SHADOWRUN' || u8.length < 0x100000) { status('That file is not a Shadowrun (USA) ROM (title "' + title.trim() + '"). Open the .sfc or .smc file of the US release.', 'err'); return; }
+  romU8 = u8; romName = file.name; romCrc = crc32(u8); S = new SP.Sprites(u8); shared.clear(); own.clear();
+  const T = new ST.Texts(u8), rw = a => u8[((a & 0x7F0000) >> 1) | (a & 0x7FFF)] | (u8[(((a + 1) & 0x7F0000) >> 1) | ((a + 1) & 0x7FFF)] << 8);
+  names = []; info = [];
+  for (let s = 0; s < S.n; s++) {
+    const id = rw(0x8CEFB0 + 6 * s); let nm = '';
+    if (id && id !== 0xFFFF && id < 0xC000) { const d = T.decode(id); if (d && d.codes.length < 40) nm = ST.fromCodes(d.codes).replace(/\|/g, ''); }
+    names.push(s === 0x0B ? 'Jake (' + (nm || 'Me') + ')' : nm);
+    const a = S.animations(s); info.push({ s, anims: a.length, pals: [...new Set(a.map(x => x.palette))] });
+  }
+  $('romname').textContent = file.name + ' · ' + (u8.length >> 20) + ' MB · CRC ' + fmtCrc(romCrc) + (S.installed() ? ' · ' + S.extraCount() + ' own palettes already' : '');
+  $('welcome').hidden = true; $('app').hidden = false; $('projlabel').hidden = false;
+  const saved = store.get('sr-sprite-edits-' + romCrc);
+  if (saved) { try { applyProject(JSON.parse(saved), true); } catch (e) {} } else status('Pick a character, then click a colour to change it.', 'ok');
+  fillList(); select(0x0B);
+  requestAnimationFrame(loop);
+}
+$('romfile').onchange = e => { if (e.target.files[0]) loadRom(e.target.files[0]); e.target.value = ''; };
+const welcome = $('welcome');
+['dragenter', 'dragover'].forEach(t => document.addEventListener(t, e => { e.preventDefault(); welcome.classList.add('hot'); }));
+['dragleave', 'drop'].forEach(t => document.addEventListener(t, e => { e.preventDefault(); welcome.classList.remove('hot'); }));
+document.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (!f) return; if (/\.json$/i.test(f.name) && romU8) loadProject(f); else loadRom(f); });
+
+// ------------------------------------------------------------ edits
+const leader = s => Math.min(...S.group(s));
+function palFor(s, pid) { const o = own.get(leader(s)); if (o && o.has(pid)) return o.get(pid); if (shared.has(pid)) return shared.get(pid); return S.palette(pid); }
+function modeFor(s, pid) { const o = own.get(leader(s)); return o && o.has(pid) ? 'own' : shared.has(pid) ? 'shared' : null; }
+const isEdited = s => own.has(leader(s)) || pix.has(leader(s)) || info[s].pals.some(p => shared.has(p));
+function usersOf(pid) { const out = []; for (const i of info) if (i.pals.includes(pid)) out.push(i.s); return out; }
+function ownNeeded() {      // new palette ids the export will hand out
+  let n = 0; for (const [s, m] of own) for (const pid of m.keys()) { const g = S.group(s); if (pid < SP.BASE_ID || usersOf(pid).some(o => !g.includes(o))) n++; } return n;
+}
+function setColour(s, pid, i, c) {
+  let m = modeFor(s, pid);
+  if (!m) m = usersOf(pid).filter(o => !S.group(s).includes(o)).length ? 'own' : 'shared';
+  if (m === 'own') { const L0 = leader(s); if (!own.has(L0)) own.set(L0, new Map()); const map = own.get(L0); if (!map.has(pid)) map.set(pid, palFor(s, pid).slice()); map.get(pid)[i] = c; }
+  else { if (!shared.has(pid)) shared.set(pid, S.palette(pid).slice()); shared.get(pid)[i] = c; }
+  changed();
+}
+function setMode(s, pid, m) {
+  const cols = palFor(s, pid).slice(), L0 = leader(s);
+  if (own.has(L0)) { own.get(L0).delete(pid); if (!own.get(L0).size) own.delete(L0); }
+  if (m === 'own') { if (!own.has(L0)) own.set(L0, new Map()); own.get(L0).set(pid, cols); if (shared.has(pid) && sameAsRom(pid, shared.get(pid))) shared.delete(pid); }
+  else { shared.set(pid, cols); }
+  changed();
+}
+const sameAsRom = (pid, cols) => S.palette(pid).every((c, i) => c === cols[i]);
+function resetPal(s, pid) { const L0 = leader(s); if (own.has(L0)) { own.get(L0).delete(pid); if (!own.get(L0).size) own.delete(L0); } if (modeFor(s, pid) === 'shared') shared.delete(pid); changed(); }
+function changed() {
+  for (const [pid, c] of [...shared]) if (sameAsRom(pid, c)) shared.delete(pid);
+  for (const [L0, m] of [...own]) { for (const [pid, c] of [...m]) if (sameAsRom(pid, c)) m.delete(pid); if (!m.size) own.delete(L0); }
+  for (const [L0, m] of [...pix]) if (!m.size) pix.delete(L0);
+  const any = shared.size || own.size || pix.size; $('export').disabled = !any || S.extraCount() + ownNeeded() > SP.MAX_EXTRA; $('saveproj').disabled = !any;
+  store.set('sr-sprite-edits-' + romCrc, JSON.stringify(projectJson()));
+  panels(); refreshThumb(cur); meters(); if (painting) { brushes(); drawBig(); }
+}
+
+// ------------------------------------------------------------ list
+function firstFrame(s) { for (const a of S.animations(s)) for (const f of a.facings) if (f.length) return { w: f[0], pid: a.palette }; return null; }
+function drawFrameTo(canvas, s, word, pid, scaleFit) {
+  const fr = S.frame(word, pix.get(leader(s))), P = palFor(s, pid).map(SP.rgb), g = canvas.getContext('2d');
+  if (!scaleFit) { canvas.width = fr.w; canvas.height = fr.h; }
+  const tmp = new ImageData(fr.w, fr.h);
+  for (let k = 0; k < fr.px.length; k++) { const v = fr.px[k]; if (v < 0) continue; tmp.data[k * 4] = P[v][0]; tmp.data[k * 4 + 1] = P[v][1]; tmp.data[k * 4 + 2] = P[v][2]; tmp.data[k * 4 + 3] = 255; }
+  if (!scaleFit) { g.putImageData(tmp, 0, 0); return fr; }
+  const c2 = document.createElement('canvas'); c2.width = fr.w; c2.height = fr.h; c2.getContext('2d').putImageData(tmp, 0, 0);
+  g.clearRect(0, 0, canvas.width, canvas.height); g.imageSmoothingEnabled = false;
+  const sc = Math.min(canvas.width / fr.w, canvas.height / fr.h, 2); g.drawImage(c2, (canvas.width - fr.w * sc) / 2, (canvas.height - fr.h * sc) / 2, fr.w * sc, fr.h * sc);
+  return fr;
+}
+let obs = null;
+function fillList() {
+  const q = $('q').value.trim().toLowerCase().replace('$', ''), list = $('list'); list.textContent = ''; let n = 0;
+  obs && obs.disconnect();
+  obs = new IntersectionObserver(es => es.forEach(en => { if (en.isIntersecting) { refreshThumb(+en.target.dataset.s); obs.unobserve(en.target); } }), { root: list, rootMargin: '200px' });
+  for (const i of info) {
+    if (!i.anims) continue;
+    if (filter === 'named' && !names[i.s]) continue;
+    if (filter === 'edited' && !isEdited(i.s)) continue;
+    if (q && !(names[i.s] || '').toLowerCase().includes(q) && hex(i.s) !== q.toUpperCase() && hex(i.s).toLowerCase() !== q) continue;
+    const b = document.createElement('button'); b.type = 'button'; b.dataset.s = i.s;
+    b.innerHTML = '<canvas width="44" height="44"></canvas><span><span class="t"></span><br><span class="w"></span></span>';
+    b.querySelector('.t').textContent = (isEdited(i.s) ? '● ' : '') + (names[i.s] || 'Sprite $' + hex(i.s)); if (isEdited(i.s)) b.querySelector('.t').classList.add('ed');
+    b.querySelector('.w').textContent = '$' + hex(i.s) + ' · palette ' + i.pals.map(p => '$' + hex(p)).join(', ');
+    b.setAttribute('aria-pressed', cur === i.s); b.onclick = () => select(i.s);
+    list.appendChild(b); obs.observe(b); n++;
+  }
+  $('count').textContent = n + ' sprites';
+}
+function refreshThumb(s) {
+  if (s == null) return; const b = $('list').querySelector('[data-s="' + s + '"]'); if (!b) return;
+  const f = firstFrame(s); if (f) drawFrameTo(b.querySelector('canvas'), s, f.w, f.pid, true);
+  const t = b.querySelector('.t'); t.textContent = (isEdited(s) ? '● ' : '') + (names[s] || 'Sprite $' + hex(s)); t.classList.toggle('ed', isEdited(s));
+}
+$('q').oninput = fillList;
+document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { filter = b.dataset.f; document.querySelectorAll('[data-f]').forEach(x => x.setAttribute('aria-pressed', x === b)); fillList(); });
+
+// ------------------------------------------------------------ preview
+function select(s) {
+  cur = s; anims = S.animations(s); animI = 0; frameI = 0; undoStack = []; $('pundo').disabled = true;
+  faceI = anims.length ? Math.max(0, anims[0].facings.findIndex(f => f.length)) : 0;
+  for (const b of $('list').children) b.setAttribute('aria-pressed', +b.dataset.s === s);
+  $('sname').textContent = names[s] || 'Sprite $' + hex(s); $('sid').textContent = 'sprite $' + hex(s);
+  const g = S.group(s); $('group').textContent = g.length > 1 ? 'Shares its animations with sprite ' + g.filter(o => o !== s).map(o => '$' + hex(o)).join(', ') + ', so they change together.' : '';
+  const sel = $('anim'); sel.textContent = '';
+  anims.forEach((a, i) => { const o = document.createElement('option'); o.value = i; o.textContent = 'Animation ' + (a.index + 1) + ' · palette $' + hex(a.palette); sel.appendChild(o); });
+  buildFacing(); panels(); meters(); drawBig();
+}
+function buildFacing() {
+  const box = $('facing'); box.textContent = ''; const a = anims[animI]; if (!a) return;
+  [3, 4, 5, 2, 6, 1, 0, 7].forEach(f => { const b = document.createElement('button'); b.type = 'button'; b.textContent = FACE[f]; b.disabled = !a.facings[f].length; b.setAttribute('aria-pressed', f === faceI); b.onclick = () => { faceI = f; frameI = 0; buildFacing(); drawBig(); }; box.appendChild(b); });
+}
+$('anim').onchange = () => { animI = +$('anim').value; frameI = 0; const a = anims[animI]; if (!a.facings[faceI].length) faceI = Math.max(0, a.facings.findIndex(f => f.length)); buildFacing(); drawBig(); };
+$('play').onclick = () => { playing = !playing; $('play').setAttribute('aria-pressed', playing); $('play').textContent = playing ? 'Playing' : 'Paused'; };
+function loop() {
+  requestAnimationFrame(loop);
+  if (cur == null) return; const a = anims[animI]; if (!a) return; const fr = a.facings[faceI]; if (!fr || !fr.length) return;
+  tick++; const delay = Math.max(4, (a.delay & 0x7F) || 8);
+  if (playing && !painting && tick % delay === 0) frameI = (frameI + 1) % fr.length;
+  if (tick % 2) return;
+  const cv = $('pv'), f = drawFrameTo(cv, cur, fr[frameI % fr.length], a.palette, false); cv.style.width = f.w * 4 + 'px'; cv.style.height = f.h * 4 + 'px';
+}
+
+// ------------------------------------------------------------ pixel painting
+// Cells are 16x16 graphics shared by every frame (and mirrored facing) that shows them, so a stroke changes all of
+// them. At export, strips used only by this character are rewritten; shared ones get copies (srspr.js applyPixels).
+let Z = 8, bigFrame = null;
+function curWord() { const a = anims[animI]; if (!a) return null; const f = a.facings[faceI]; return f && f.length ? f[frameI % f.length] : null; }
+function brushes() {
+  const box = $('brushes'); box.textContent = ''; const a = anims[animI]; if (!a) return;
+  palFor(cur, a.palette).forEach((c, i) => {
+    const b = document.createElement('button'); b.type = 'button';
+    if (!i) { b.className = 'zero'; b.title = 'Transparent'; b.innerHTML = '<span>0</span>'; }
+    else { const [r, g, bb] = SP.rgb(c); b.style.background = 'rgb(' + r + ',' + g + ',' + bb + ')'; b.innerHTML = '<span>' + i + '</span>'; b.title = 'Colour ' + i; }
+    b.classList.toggle('sel', i === brush); b.onclick = () => { brush = i; brushes(); }; box.appendChild(b);
+  });
+}
+function drawBig() {
+  if (!painting || cur == null) return; const w = curWord(), a = anims[animI]; if (w == null) return;
+  const fr = S.frame(w, pix.get(leader(cur))), P = palFor(cur, a.palette).map(SP.rgb); bigFrame = fr;
+  Z = Math.max(4, Math.min(14, Math.floor(520 / Math.max(fr.w, fr.h))));
+  const cv = $('big'); cv.width = fr.w * Z; cv.height = fr.h * Z; const g = cv.getContext('2d');
+  for (let y = 0; y < fr.h; y++) for (let x = 0; x < fr.w; x++) {
+    const v = fr.px[y * fr.w + x];
+    if (v < 0) { g.fillStyle = ((x + y) & 1) ? '#2c3040' : '#252836'; } else g.fillStyle = 'rgb(' + P[v].join(',') + ')';
+    g.fillRect(x * Z, y * Z, Z, Z);
+  }
+  const has = new Set(fr.cells.map(c => c.x + ',' + c.y));
+  for (let cy = 0; cy < fr.h; cy += 16) for (let cx = 0; cx < fr.w; cx += 16) if (!has.has(cx + ',' + cy)) { g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(cx * Z, cy * Z, 16 * Z, 16 * Z); }
+  g.strokeStyle = 'rgba(255,255,255,.07)'; g.beginPath();
+  for (let x = 0; x <= fr.w; x++) { g.moveTo(x * Z + .5, 0); g.lineTo(x * Z + .5, fr.h * Z); } for (let y = 0; y <= fr.h; y++) { g.moveTo(0, y * Z + .5); g.lineTo(fr.w * Z, y * Z + .5); } g.stroke();
+  g.strokeStyle = 'rgba(255,79,154,.5)'; g.beginPath();
+  for (let x = 0; x <= fr.w; x += 16) { g.moveTo(x * Z + .5, 0); g.lineTo(x * Z + .5, fr.h * Z); } for (let y = 0; y <= fr.h; y += 16) { g.moveTo(0, y * Z + .5); g.lineTo(fr.w * Z, y * Z + .5); } g.stroke();
+  const f = a.facings[faceI]; $('fpos').textContent = 'Frame ' + (frameI % f.length + 1) + ' of ' + f.length;
+  const m = pix.get(leader(cur)); $('preset').disabled = !m;
+  $('pixnote').textContent = 'Pink lines mark 16×16 graphics cells; darkened squares have no graphics and cannot be painted. A cell is often reused by other frames and by the mirrored facing, so painting it changes those too.' + (m ? ' ' + m.size + ' cell' + (m.size === 1 ? '' : 's') + ' repainted.' : '');
+}
+function cellAt(X, Y) { if (!bigFrame) return null; return bigFrame.cells.find(c => X >= c.x && X < c.x + 16 && Y >= c.y && Y < c.y + 16) || null; }
+let stroke = null;
+// set frame pixel (X, Y) to v inside the current stroke; false if (X, Y) has no graphics cell
+function setPx(X, Y, v) {
+  const c = cellAt(X, Y); if (!c) return false;
+  const L0 = leader(cur); if (!pix.has(L0)) pix.set(L0, new Map()); const m = pix.get(L0);
+  if (!stroke.saved.has(c.key)) stroke.saved.set(c.key, m.has(c.key) ? m.get(c.key).slice() : null);
+  let arr = m.get(c.key); if (!arr) { const [t, b] = c.key.split(',').map(Number); arr = S.cellPixels(t, b); m.set(c.key, arr); }
+  let x = X - c.x, y = Y - c.y; if (c.hf) x = 15 - x; if (c.vf) y = 15 - y;
+  arr[y * 16 + x] = v; return true;
+}
+const pxAt = (X, Y) => bigFrame.px[Y * bigFrame.w + X] < 0 ? 0 : bigFrame.px[Y * bigFrame.w + X];
+let tool = 'pen';
+document.querySelectorAll('[data-tool]').forEach(b => b.onclick = () => { tool = b.dataset.tool; document.querySelectorAll('[data-tool]').forEach(x => x.setAttribute('aria-pressed', x === b)); });
+function evXY(e) { const r = $('big').getBoundingClientRect(); return [Math.floor((e.clientX - r.left) / Z), Math.floor((e.clientY - r.top) / Z)]; }
+function paintAt(e) {
+  const [X, Y] = evXY(e); if (X < 0 || Y < 0 || X >= bigFrame.w || Y >= bigFrame.h || !cellAt(X, Y)) return;
+  if (pxAt(X, Y) === brush) return; setPx(X, Y, brush); drawBig();
+}
+// flood fill: 4-connected pixels of the same colour, staying inside cells that have graphics
+function fillAt(X, Y) {
+  if (!cellAt(X, Y)) return; const from = pxAt(X, Y); if (from === brush) return;
+  const W = bigFrame.w, H = bigFrame.h, seen = new Uint8Array(W * H), todo = [[X, Y]], list = [];
+  while (todo.length) { const [x, y] = todo.pop(); if (x < 0 || y < 0 || x >= W || y >= H || seen[y * W + x]) continue; seen[y * W + x] = 1;
+    if (!cellAt(x, y) || pxAt(x, y) !== from) continue; list.push([x, y]); todo.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]); }
+  for (const [x, y] of list) setPx(x, y, brush);
+}
+function oneShot(fn) { stroke = { L0: leader(cur), saved: new Map() }; fn(); endStroke(); drawBig(); }
+$('big').addEventListener('contextmenu', e => { if (painting) e.preventDefault(); });
+$('big').addEventListener('pointerdown', e => { if (!painting || !bigFrame) return;
+  const [X, Y] = evXY(e);
+  if (tool === 'pick' || e.button === 2 || e.altKey) { if (X >= 0 && Y >= 0 && X < bigFrame.w && Y < bigFrame.h) { brush = pxAt(X, Y); brushes(); } return; }
+  if (e.button !== 0) return;
+  if (tool === 'fill') { oneShot(() => fillAt(X, Y)); return; }
+  stroke = { L0: leader(cur), saved: new Map() }; $('big').setPointerCapture(e.pointerId); paintAt(e); });
+$('big').addEventListener('pointermove', e => { if (stroke) paintAt(e); });
+const endStroke = () => { if (!stroke) return; if (stroke.saved.size) { undoStack.push(stroke); $('pundo').disabled = false; } stroke = null; cleanPix(); changed(); };
+$('big').addEventListener('pointerup', endStroke); $('big').addEventListener('pointercancel', endStroke);
+function cleanPix() {   // drop cells painted back to their original pixels
+  for (const [L0, m] of [...pix]) { for (const [k, arr] of [...m]) { const [t, b] = k.split(',').map(Number), o = S.cellPixels(t, b); if (arr.every((v, i) => v === o[i])) m.delete(k); } if (!m.size) pix.delete(L0); }
+}
+$('pundo').onclick = () => { const st = undoStack.pop(); if (!st) return; const m = pix.get(st.L0) || new Map(); pix.set(st.L0, m);
+  for (const [k, v] of st.saved) { if (v) m.set(k, v); else m.delete(k); } $('pundo').disabled = !undoStack.length; cleanPix(); changed(); drawBig(); };
+$('preset').onclick = () => { if (cur == null) return; pix.delete(leader(cur)); undoStack = []; $('pundo').disabled = true; changed(); drawBig(); status('This character\'s pixels are back to the originals.'); };
+$('pixon').onclick = () => { painting = !painting; $('pixon').setAttribute('aria-pressed', painting); $('pixon').textContent = painting ? 'Painting' : 'Paint pixels';
+  $('pixui').hidden = !painting; $('pixintro').hidden = painting; if (painting) { brushes(); drawBig(); } };
+// copy / paste a whole frame (indices; empty cells are skipped), optionally mirrored left-right
+let clip = null;
+$('fcopy').onclick = () => { if (!bigFrame) return; clip = { w: bigFrame.w, h: bigFrame.h, px: Int16Array.from(bigFrame.px) }; $('fpaste').disabled = $('fpastem').disabled = false; status('Frame copied (' + clip.w + '×' + clip.h + '). Go to another frame and paste.'); };
+function paste(mirror) {
+  if (!clip || !bigFrame) return; let n = 0;
+  oneShot(() => { for (let y = 0; y < Math.min(clip.h, bigFrame.h); y++) for (let x = 0; x < Math.min(clip.w, bigFrame.w); x++) {
+    const sx = mirror ? clip.w - 1 - x : x, v = clip.px[y * clip.w + sx]; if (v < 0) continue; if (setPx(x, y, v)) n++; } });
+  status('Pasted' + (mirror ? ' mirrored' : '') + '.' + (clip.w !== bigFrame.w || clip.h !== bigFrame.h ? ' The frames differ in size (' + clip.w + '×' + clip.h + ' onto ' + bigFrame.w + '×' + bigFrame.h + '), so it was lined up at the top left.' : ''), 'ok');
+}
+$('fpaste').onclick = () => paste(false); $('fpastem').onclick = () => paste(true);
+// PNG round trip for one frame: transparent = colour 0; other colours snap to the nearest palette colour
+function frameName() { const a = anims[animI]; return 'sprite_' + hex(cur) + '_anim' + (a.index + 1) + '_' + FACE[faceI] + '_f' + (frameI % a.facings[faceI].length + 1) + '.png'; }
+$('pngout').onclick = async () => {
+  if (!bigFrame) return; const P = palFor(cur, anims[animI].palette).map(SP.rgb), c = document.createElement('canvas'); c.width = bigFrame.w; c.height = bigFrame.h;
+  const g = c.getContext('2d'), id = g.createImageData(c.width, c.height);
+  bigFrame.px.forEach((v, k) => { if (v <= 0) return; id.data.set([...P[v], 255], k * 4); }); g.putImageData(id, 0, 0);
+  const blob = await new Promise(r => c.toBlob(r, 'image/png')), data = new Uint8Array(await blob.arrayBuffer());
+  const ok = await offer(frameName(), data); if (ok) $('pngnote').textContent = 'Saved ' + frameName() + ' (' + c.width + '×' + c.height + '). Edit it with the palette colours and load it back.';
+};
+$('pngin').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f || !bigFrame) return;
+  const img = await createImageBitmap(f).catch(() => null); if (!img) { status('Could not read that image.', 'err'); return; }
+  if (img.width !== bigFrame.w || img.height !== bigFrame.h) { status('That image is ' + img.width + '×' + img.height + ' but this frame is ' + bigFrame.w + '×' + bigFrame.h + '. Save the frame as PNG first and edit that file.', 'err'); return; }
+  const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+  const d = g.getImageData(0, 0, c.width, c.height).data, P = palFor(cur, anims[animI].palette).map(SP.rgb); let snapped = 0, lost = 0;
+  oneShot(() => { for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) {
+    const o = (y * c.width + x) * 4, r = d[o], gg = d[o + 1], b = d[o + 2], a = d[o + 3]; let v = 0;
+    if (a >= 128 && !(r === 255 && gg === 0 && b === 255)) { let best = 1, bd = 1e9; for (let k = 1; k < 16; k++) { const q = P[k], dd = (q[0] - r) ** 2 + (q[1] - gg) ** 2 + (q[2] - b) ** 2; if (dd < bd) { bd = dd; best = k; } } v = best; if (bd > 3 * 8 * 8) snapped++; }
+    if (!setPx(x, y, v) && v) lost++; } });
+  status('Loaded ' + f.name + ' into this frame.' + (snapped ? ' ' + snapped + ' pixel' + (snapped === 1 ? '' : 's') + ' had colours outside the palette and took the nearest one.' : '') + (lost ? ' ' + lost + ' pixel' + (lost === 1 ? '' : 's') + ' fell on squares without graphics and were dropped.' : ''), snapped || lost ? 'err' : 'ok');
+};
+$('fprev').onclick = () => { const f = anims[animI].facings[faceI]; frameI = (frameI - 1 + f.length) % f.length; drawBig(); };
+$('fnext').onclick = () => { const f = anims[animI].facings[faceI]; frameI = (frameI + 1) % f.length; drawBig(); };
+
+// ------------------------------------------------------------ palette panels
+let pick = null;
+$('picker').addEventListener('input', () => { if (!pick) return; const v = $('picker').value, r = parseInt(v.slice(1, 3), 16), g = parseInt(v.slice(3, 5), 16), b = parseInt(v.slice(5, 7), 16); setColour(pick.s, pick.pid, pick.i, SP.snes(r, g, b)); });
+function panels() {
+  const box = $('pals'); box.textContent = ''; if (cur == null) return;
+  for (const pid of info[cur].pals) {
+    const card = document.createElement('div'); card.className = 'card';
+    const g = S.group(cur), others = usersOf(pid).filter(o => !g.includes(o)), m = modeFor(cur, pid) || (others.length ? 'own' : 'shared');
+    const head = document.createElement('div'); head.className = 'row';
+    head.innerHTML = '<h2 class="grow"></h2><button class="reset">Reset</button>';
+    head.firstChild.textContent = 'Palette $' + hex(pid) + (pid >= SP.BASE_ID ? ' (own)' : '') + (others.length ? ' · also used by ' + others.length + ' other sprite' + (others.length > 1 ? 's' : '') : ' · used only by this character');
+    head.querySelector('.reset').disabled = !modeFor(cur, pid); head.querySelector('.reset').onclick = () => resetPal(cur, pid);
+    card.appendChild(head);
+    if (others.length) {
+      const chips = document.createElement('div'); chips.className = 'chips';
+      for (const [k, label] of [['own', 'Only this character (own palette)'], ['shared', 'Everyone using palette $' + hex(pid)]]) {
+        const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.setAttribute('aria-pressed', m === k);
+        b.onclick = () => setMode(cur, pid, k); chips.appendChild(b);
+      }
+      card.appendChild(chips);
+      const sl = document.createElement('div'); sl.className = 'shared-list';
+      sl.textContent = 'Shared with: ' + others.map(o => (names[o] || 'sprite') + ' $' + hex(o)).join(', ');
+      card.appendChild(sl);
+    }
+    const sw = document.createElement('div'); sw.className = 'sw'; const cols = palFor(cur, pid), orig = S.palette(pid);
+    cols.forEach((c, i) => {
+      const b = document.createElement('button'); b.type = 'button';
+      if (!i) { b.className = 'zero'; b.title = 'Colour 0 is transparent'; b.disabled = true; sw.appendChild(b); return; }
+      const [r, gg, bb] = SP.rgb(c); b.style.background = 'rgb(' + r + ',' + gg + ',' + bb + ')'; b.innerHTML = '<span>' + i + '</span>';
+      if (c !== orig[i]) b.classList.add('chg');
+      b.title = 'Colour ' + i + ': click to change';
+      b.onclick = () => { pick = { s: cur, pid, i }; const p = $('picker'), rc = b.getBoundingClientRect(); p.style.position = 'fixed'; p.style.left = rc.left + 'px'; p.style.top = rc.bottom + 'px'; p.value = '#' + [r, gg, bb].map(v => v.toString(16).padStart(2, '0')).join(''); p.click(); };
+      sw.appendChild(b);
+    });
+    card.appendChild(sw);
+    const note = document.createElement('div'); note.className = 'muted small';
+    note.textContent = m === 'own' ? 'Changes here recolour only this character' + (g.length > 1 ? ' and the sprites that share its animations' : '') + '.' : others.length ? 'Changes here recolour every sprite listed above.' : 'Changes here recolour this character.';
+    card.appendChild(note);
+    box.appendChild(card);
+  }
+}
+function meters() {
+  const used = S.extraCount(), add = ownNeeded(), tot = used + add, m = $('meters'); m.innerHTML = '';
+  const a = document.createElement('span'); a.textContent = 'Own palettes';
+  const b = document.createElement('div'); b.className = 'bar' + (tot > SP.MAX_EXTRA ? ' over' : tot > SP.MAX_EXTRA * 0.9 ? ' warn' : ''); b.innerHTML = '<i></i>'; b.firstChild.style.width = Math.min(100, tot / SP.MAX_EXTRA * 100) + '%';
+  const c = document.createElement('span'); c.className = 'mono'; c.textContent = tot + ' / ' + SP.MAX_EXTRA;
+  m.append(a, b, c);
+  if (tot > SP.MAX_EXTRA) status('More than ' + SP.MAX_EXTRA + ' own palettes: switch some characters back to the shared palette before exporting.', 'err');
+}
+
+// ------------------------------------------------------------ projects + export
+function projectJson() {
+  const sh = {}; for (const [p, c] of shared) sh[hex(p)] = c;
+  const ow = {}; for (const [s, m] of own) { ow[hex(s)] = {}; for (const [p, c] of m) ow[hex(s)][hex(p)] = c; }
+  const px = {}; for (const [s, m] of pix) { px[hex(s)] = {}; for (const [k, arr] of m) px[hex(s)][k] = Array.from(arr, v => v.toString(16)).join(''); }
+  return { tool: 'Shadowrun Sprite Colours', version: 2, base_crc32: fmtCrc(romCrc), base_name: romName, shared: sh, own: ow, pixels: px };
+}
+function applyProject(j, auto) {
+  shared.clear(); own.clear(); pix.clear(); let n = 0;
+  const ok = c => Array.isArray(c) && c.length === 16 && c.every(v => Number.isInteger(v) && v >= 0 && v < 0x8000);
+  for (const [p, c] of Object.entries(j.shared || {})) if (ok(c)) { shared.set(parseInt(p, 16), c); n++; }
+  for (const [s, m] of Object.entries(j.own || {})) { const sp = parseInt(s, 16); if (!(sp >= 0 && sp < S.n)) continue; const mm = new Map();
+    for (const [p, c] of Object.entries(m)) if (ok(c) && info[sp].pals.includes(parseInt(p, 16))) { mm.set(parseInt(p, 16), c); n++; } if (mm.size) own.set(leader(sp), mm); }
+  let np = 0;
+  for (const [s, m] of Object.entries(j.pixels || {})) { const sp = parseInt(s, 16); if (!(sp >= 0 && sp < S.n)) continue; const mm = new Map();
+    for (const [k, h] of Object.entries(m)) if (/^\d+,\d+$/.test(k) && typeof h === 'string' && /^[0-9a-f]{256}$/i.test(h)) { mm.set(k, Uint8Array.from(h, ch => parseInt(ch, 16))); np++; }
+    if (mm.size) pix.set(leader(sp), mm); }
+  const other = j.base_crc32 && j.base_crc32 !== fmtCrc(romCrc);
+  status((auto ? 'Picked up your unsaved edits from last time: ' : 'Loaded edits: ') + n + ' palette' + (n === 1 ? '' : 's') + (np ? ' and ' + np + ' repainted cell' + (np === 1 ? '' : 's') : '') + '.' + (other ? ' They were made on a different ROM; check them before exporting.' : ''), other ? 'err' : 'ok');
+  if (cur != null) { changed(); fillList(); }
+}
+async function loadProject(file) { try { applyProject(JSON.parse(await file.text()), false); changed(); fillList(); } catch (e) { status('Could not read that edits file: ' + e.message, 'err'); } }
+$('projfile').onchange = e => { if (e.target.files[0]) loadProject(e.target.files[0]); e.target.value = ''; };
+async function offer(filename, data) {
+  const dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
+  if (dl) {
+    try { await dl.save({ filename, data }); return true; }
+    catch (e) { if (e && e.code === 'declined') { status('Save cancelled.'); return false; } if (!['unavailable', 'not_granted', 'capability_disabled', 'capability_removed'].includes(e && e.code)) { status('Could not save: ' + (e && e.message || e), 'err'); return false; } }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data])); a.download = filename; document.body.appendChild(a); a.click(); a.remove(); return true;
+}
+function ipsDiff(oldU8, newU8) {
+  const out = [0x50, 0x41, 0x54, 0x43, 0x48], n = newU8.length, grew = n > oldU8.length, old = i => (i < oldU8.length ? oldU8[i] : 0); let i = 0;
+  while (i < n) { if (old(i) === newU8[i]) { i++; continue; } let j = i; while (j < n && j - i < 0xFFFF && (old(j) !== newU8[j] || (j + 1 < n && old(j + 1) !== newU8[j + 1]))) j++;
+    let s = i; if (s === 0x454F46) s--; out.push(s >> 16, (s >> 8) & 0xFF, s & 0xFF, ((j - s) >> 8) & 0xFF, (j - s) & 0xFF); for (let k = s; k < j; k++) out.push(newU8[k]); i = j; }
+  if (grew) { const s = n - 1; out.push(s >> 16, (s >> 8) & 0xFF, s & 0xFF, 0, 1, newU8[n - 1]); }
+  out.push(0x45, 0x4F, 0x46); return Uint8Array.from(out);
+}
+function zip(files) {
+  const enc = new TextEncoder(), parts = [], central = []; let off = 0;
+  for (const f of files) {
+    const name = enc.encode(f.name), data = typeof f.data === 'string' ? enc.encode(f.data) : f.data, crc = crc32(data);
+    const h = new DataView(new ArrayBuffer(30)); h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(12, 0x5521, true); h.setUint32(14, crc, true); h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, name.length, true);
+    parts.push(new Uint8Array(h.buffer), name, data);
+    const c = new DataView(new ArrayBuffer(46)); c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(14, 0x5521, true); c.setUint32(16, crc, true); c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, name.length, true); c.setUint32(42, off, true);
+    central.push(new Uint8Array(c.buffer), name); off += 30 + name.length + data.length;
+  }
+  const csize = central.reduce((s, p) => s + p.length, 0), e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, csize, true); e.setUint32(16, off, true);
+  return new Blob([...parts, ...central, new Uint8Array(e.buffer)]);
+}
+$('saveproj').onclick = () => offer('shadowrun_sprite_colours.json', JSON.stringify(projectJson(), null, 1));
+$('export').onclick = async () => {
+  status('Building the patch…'); await new Promise(r => setTimeout(r, 30));
+  let res; try { res = SP.apply(romU8, { shared, own, pixels: pix }); } catch (e) { status('Could not build the patch: ' + e.message, 'err'); return; }
+  const ips = ipsDiff(romU8, res.rom), crcOut = fmtCrc(crc32(res.rom));
+  const lines = res.report.map(r => r.pixels ? 'sprite $' + hex(r.sprite) + ' (' + (names[r.sprite] || 'sprite') + '): ' + r.cells + ' repainted cell' + (r.cells === 1 ? '' : 's') + ', ' + r.inPlace + ' graphics strips rewritten, ' + r.copied + ' copied to bank $BC' + (r.others.length ? '; frames also used by sprite ' + r.others.map(o => '$' + hex(o)).join(', ') + ' change too' : '') : r.shared != null ? 'palette $' + hex(r.shared) + ' recoloured for everyone who uses it' : 'sprite $' + hex(r.sprite) + ' (' + (names[r.sprite] || 'sprite') + '): palette $' + hex(r.from) + (r.to !== r.from ? ' -> own palette $' + hex(r.to) : ' recoloured (already its own)'));
+  const readme = ['Shadowrun Sprite Colours patch', '', 'Apply Shadowrun_SpriteColours.ips to the ROM you edited:', '  ' + romName + '  (' + (romU8.length >> 20) + ' MB, CRC32 ' + fmtCrc(romCrc) + ')', 'Result: ' + (res.rom.length >> 20) + ' MB, CRC32 ' + crcOut, '', ...lines, '',
+    'Repainted graphics: strips used only by that character are rewritten where they are; shared ones are copied to $BC:8000-$BD:FFFF.',
+    'Own palettes live in bank $AF (hooks at $80AA97, $81A8D1, $81A8E1, and the Runner Pack sprite cache if present).',
+    'Apply this AFTER the Runner Pack: a Runner Pack patch applied later would undo the cache hook.',
+    'The map and text editor patches use different parts of the ROM and can be applied in any order.'].join('\n');
+  const ok = await offer('Shadowrun_SpriteColours.zip', zip([{ name: 'Shadowrun_SpriteColours.ips', data: ips }, { name: 'shadowrun_sprite_colours.json', data: JSON.stringify(projectJson(), null, 1) }, { name: 'README.txt', data: readme }]));
+  if (ok) status('Patch ready: ' + res.report.length + ' change' + (res.report.length === 1 ? '' : 's') + ', IPS ' + ips.length + ' bytes. Patched ROM CRC32 ' + crcOut + '.', 'ok');
+};
+})();
+</script>
+
+</html>

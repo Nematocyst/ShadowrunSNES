@@ -4,6 +4,8 @@ Oct 18, 2026 · @Fabio
 
 ## Summary
 
+> This page describes Runner Pack v5.2. The current patch in this repository is [v6](../patches/RunnerPack_v6/README.txt), which adds Glutman's Jobs (repeatable paid missions with kill or hack objectives); the v5.2 file itself is not kept here. v5.1 is in [`patches/RunnerPack_v5.1/`](../patches/RunnerPack_v5.1/).
+
 The Runner Pack is one patch for Shadowrun (SNES, USA) that bundles five gameplay hacks. The current release is **Runner Pack v5.2**, file `Shadowrun_RunnerPack_v5.2.zip`, which turns the clean 1 MB ROM into a 2 MB ROM with CRC32 `329573CC`. Every hack was built by reverse-engineering the original game code, and each one also builds as its own patch.
 
 | Hack | What it does in one line |

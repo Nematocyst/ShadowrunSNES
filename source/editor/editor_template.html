@@ -1,0 +1,1045 @@
+<title>Shadowrun Map Editor</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a workbench. Map canvas fills the left, a fixed-width inspector + block catalogue on the right; stacks on phones.
+   Single dark look on purpose: map art is judged against black, like the game itself. */
+:root {
+  --bg: #0d0f14; --panel: #151922; --panel-2: #1c2130; --line: #2a3142; --fg: #e4e7ef; --muted: #8d95a8;
+  --accent: #ff4f9a; --accent-ink: #1a0610; --cyan: #3fd6e8; --green: #59e08a; --yellow: #f2c94c; --red: #ff6b5e;
+  --display: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--fg); font: 14px/1.45 var(--body); }
+.wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 14px 24px; display: flex; flex-direction: column; gap: 12px; min-height: 100%; box-sizing: border-box; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+h1 { font: 600 22px/1 var(--display); letter-spacing: .02em; margin: 0; }
+h1 span { color: var(--accent); }
+h2 { font: 600 13px/1.2 var(--display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.grow { flex: 1 1 auto; }
+button, .btn, select, input { font: inherit; color: var(--fg); }
+button, .btn { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 6px 11px; cursor: pointer; white-space: nowrap; }
+button:hover:not(:disabled), .btn:hover { border-color: var(--muted); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+button:focus-visible, input:focus-visible, select:focus-visible, .btn:focus-within { outline: 2px solid var(--cyan); outline-offset: 2px; }
+input[type="number"], input[type="search"], select { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; min-width: 0; }
+input[type="number"] { width: 5.5em; font-family: var(--mono); }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.toolbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 4px; }
+main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 12px; flex: 1 1 auto; min-height: 0; }
+@media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); } }
+.stage { background: #000; border: 1px solid var(--line); border-radius: 8px; overflow: auto; position: relative; min-height: 320px; max-height: calc(100vh - 170px); }
+.stage canvas { display: block; image-rendering: pixelated; }
+#over { position: absolute; left: 0; top: 0; }
+aside { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.field { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
+.meters { display: grid; grid-template-columns: auto 1fr auto; gap: 6px 10px; align-items: center; font-size: 12px; }
+.bar { height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--cyan); }
+.bar.warn i { background: var(--yellow); } .bar.over i { background: var(--red); }
+.cat { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; max-height: 420px; overflow-y: auto; padding-right: 2px; }
+.blk { background: #000; border: 1px solid var(--line); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; gap: 2px; align-items: stretch; cursor: pointer; text-align: left; }
+.blk canvas { width: 100%; aspect-ratio: 4 / 3; image-rendering: pixelated; }
+.blk span { font: 11px var(--mono); color: var(--muted); }
+.blk.used span { color: var(--accent); }
+.drop { border: 2px dashed var(--line); border-radius: 10px; padding: 20px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 24px; align-items: center; }
+@media (max-width: 760px) { .drop { grid-template-columns: minmax(0, 1fr); } }
+.drop.hot { border-color: var(--accent); }
+.drop img { width: 100%; border-radius: 6px; border: 1px solid var(--line); image-rendering: pixelated; }
+.drop ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; max-width: 60ch; }
+.drop p { margin: 0; max-width: 62ch; }
+.badge { font: 500 11px var(--mono); padding: 2px 6px; border-radius: 4px; background: var(--panel-2); border: 1px solid var(--line); }
+.badge.edit { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.msg { font-size: 13px; padding: 8px 10px; border-radius: 6px; background: var(--panel-2); border-left: 3px solid var(--cyan); }
+.msg.err { border-left-color: var(--red); } .msg.ok { border-left-color: var(--green); }
+.keys { font-size: 12px; color: var(--muted); display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; }
+kbd { font: 11px var(--mono); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; color: var(--fg); }
+#mapsel { max-width: 340px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+@media (prefers-reduced-motion: no-preference) { .bar i { transition: width .2s; } }
+
+.modes { display: flex; gap: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.modes button { border: 0; border-radius: 0; border-right: 1px solid var(--line); padding: 7px 14px; font-family: var(--display); font-weight: 600; letter-spacing: .03em; }
+.modes button:last-child { border-right: 0; }
+.modes button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.pal { display: grid; grid-template-columns: repeat(auto-fill, minmax(66px, 1fr)); gap: 4px; max-height: 360px; overflow-y: auto; }
+.pal button { padding: 3px; background: #000; display: flex; flex-direction: column; align-items: center; gap: 2px; font: 10px var(--mono); color: var(--muted); }
+.pal button canvas { width: 64px; height: 32px; image-rendering: pixelated; }
+.pal button[aria-pressed="true"] { outline: 2px solid var(--accent); background: #000; color: var(--accent); }
+.list { display: flex; flex-direction: column; gap: 2px; max-height: 300px; overflow-y: auto; }
+.list button { text-align: left; display: flex; gap: 8px; align-items: baseline; padding: 4px 8px; background: transparent; border-color: transparent; }
+.list button[aria-pressed="true"] { background: var(--panel-2); color: var(--fg); border-color: var(--accent); }
+.list button .mono { color: var(--muted); font-size: 12px; }
+.list button.off { opacity: .5; text-decoration: line-through; }
+.grid6 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.grid6 input { width: 100%; box-sizing: border-box; }
+select.wide { width: 100%; }
+</style>
+
+<div class="wrap">
+<header>
+  <h1>Shadowrun <span>Map Editor</span></h1>
+  <span class="muted" id="romname">No ROM loaded</span>
+  <span class="grow"></span>
+  <label class="btn" for="romfile">Open ROM…</label>
+  <input type="file" id="romfile" accept=".sfc,.smc,.bin" class="visually-hidden">
+  <label class="btn" for="projfile" id="projlabel" hidden>Load edits…</label>
+  <input type="file" id="projfile" accept=".json" class="visually-hidden">
+  <button id="saveproj" disabled>Save edits</button>
+  <button id="export" class="primary" disabled>Export patch</button>
+</header>
+
+<section id="welcome" class="drop" aria-label="Open a ROM">
+  <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+    <h2>Rearrange any map in the game</h2>
+    <p>Maps in Shadowrun are built from about 550 building blocks (walls, desks, doors, cars, stairs) laid over a painted floor. This editor moves, adds, flips and removes blocks, repaints floors, adds, moves and deletes exits, walls and characters, then writes an IPS patch. Each block carries its own walls, so where Jake can walk changes with it.</p>
+    <ol>
+      <li>Open your Shadowrun (USA) ROM with the button or drop it here. The vanilla 1 MB ROM and the 2 MB Runner Pack ROM both work. It stays in your browser.</li>
+      <li>Pick a map and a mode: Blocks, Floor, Exits &amp; walls, or Characters.</li>
+      <li>Export: you get a .zip with the .ips patch for that ROM.</li>
+    </ol>
+  </div>
+  <figure style="margin:0;display:flex;flex-direction:column;gap:6px;min-width:0">
+    <img alt="Downtown streets with a fountain plaza, rendered from the ROM" src="data:image/png;base64,/*PREVIEW*/">
+    <figcaption class="muted" style="font-size:12px">Example: map $001, the streets of Downtown, built from 118 blocks.</figcaption>
+  </figure>
+</section>
+
+<div id="app" hidden style="display:flex;flex-direction:column;gap:12px;flex:1 1 auto;min-height:0">
+  <div class="toolbar">
+    <label for="mapsel" class="visually-hidden">Map</label>
+    <select id="mapsel"></select>
+    <input type="search" id="mapq" placeholder="Find map: $0AD, Hitman…" aria-label="Find a map" style="width:190px">
+    <label class="muted" style="font-size:12px;display:flex;align-items:center;gap:6px">Music <select id="music" style="max-width:260px"></select></label>
+    <span id="shared" class="muted" style="font-size:12px"></span>
+    <span class="grow"></span>
+    <button id="undo" disabled title="Undo (Ctrl+Z)">Undo</button>
+    <button id="redo" disabled title="Redo (Ctrl+Y)">Redo</button>
+    <button id="revert" disabled>Revert map</button>
+  </div>
+  <div class="toolbar">
+    <div class="modes" role="group" aria-label="Edit mode">
+      <button data-mode="blocks" aria-pressed="true">Blocks</button><button data-mode="floor" aria-pressed="false">Floor</button><button data-mode="boxes" aria-pressed="false">Exits &amp; walls</button><button data-mode="objects" aria-pressed="false">Characters</button>
+    </div>
+    <span class="sep"></span>
+    <span class="muted" style="font-size:12px">Show</span>
+    <button id="vA" aria-pressed="true">Back layer</button>
+    <button id="vB" aria-pressed="true">Front layer</button>
+    <button id="oColl" aria-pressed="false">Block walls</button>
+    <button id="oExit" aria-pressed="true">Exits</button>
+    <button id="oObj" aria-pressed="true">Characters</button>
+    <span class="sep"></span>
+    <button data-z="1" aria-pressed="false">1×</button><button data-z="2" aria-pressed="true">2×</button><button data-z="3" aria-pressed="false">3×</button>
+  </div>
+  <main>
+    <div class="stage" id="stage"><canvas id="cv" width="768" height="512"></canvas><canvas id="over" width="768" height="512"></canvas></div>
+    <aside>
+      <!-- Blocks mode -->
+      <div class="card" data-for="blocks">
+        <h2>Selected block</h2>
+        <div id="nosel" class="muted">Click a block on the map. Click the same spot again to reach the one behind it.</div>
+        <div id="sel" hidden style="display:flex;flex-direction:column;gap:10px">
+          <div class="row"><span class="mono" id="selname" style="font-size:16px"></span><span class="badge" id="sellayer"></span><span class="muted" id="selinfo" style="font-size:12px"></span></div>
+          <div class="row">
+            <label class="field">X <input type="number" id="fx" min="-256" max="255" step="1"></label>
+            <label class="field">Y <input type="number" id="fy" min="-256" max="255" step="1"></label>
+            <label class="field">Height <input type="number" id="fz" min="-128" max="127" step="1"></label>
+          </div>
+          <div class="row">
+            <button id="bMirror" title="M">Mirror</button>
+            <button id="bLayer">Move to front layer</button>
+            <button id="bDup" title="D">Duplicate</button>
+            <button id="bDel" title="Delete">Delete</button>
+          </div>
+          <div id="selwarn" class="msg err" hidden>X, Y and height below 0 are drawn, but the game gives the block no walls there.</div>
+        </div>
+      </div>
+      <!-- Floor mode -->
+      <div class="card" data-for="floor" hidden>
+        <h2>Floor tiles</h2>
+        <div class="muted" style="font-size:12px">Pick a tile, then click or drag on the map to paint. <kbd>Alt</kbd>+click picks up the tile under the cursor. Each map uses one tile set; the tiles below are this map's set (<span id="tsetname"></span>).</div>
+        <label class="field">Tile set <select id="tsetsel" class="wide"></select></label>
+        <div class="muted" style="font-size:12px" id="tsetnote"></div>
+        <div class="row"><button id="erase" aria-pressed="false">Eraser</button><span class="muted mono" id="brushname" style="font-size:12px"></span></div>
+        <div class="pal" id="pal"></div>
+      </div>
+      <!-- Boxes mode -->
+      <div class="card" data-for="boxes" hidden>
+        <h2>Selected box</h2>
+        <div id="nobox" class="muted">Click an exit (green), a floor trigger (purple), a map wall (cyan), a sight blocker (orange) or a walking point (white, numbered) on the map, or pick one from the list. Drag to move it; <kbd>Shift</kbd>+drag to raise it.</div>
+        <div id="boxsel" hidden style="display:flex;flex-direction:column;gap:10px">
+          <div class="row"><span class="mono" id="boxname" style="font-size:16px"></span><span class="badge" id="boxkind"></span></div>
+          <div class="grid6">
+            <label class="field">X from <input type="number" id="bx1"></label><label class="field">Y from <input type="number" id="by1"></label><label class="field">Z from <input type="number" id="bz1"></label>
+            <label class="field boxto">X to <input type="number" id="bx2"></label><label class="field boxto">Y to <input type="number" id="by2"></label><label class="field boxto">Z to <input type="number" id="bz2"></label>
+          </div>
+          <label class="field" id="destrow">Leads to <select id="bdest" class="wide"></select></label>
+          <div class="muted" id="zoneinfo" style="font-size:12px"></div>
+          <label class="field" id="scriptrow">Runs script (hex) <input type="text" id="bscript" class="mono" inputmode="text" autocomplete="off" spellcheck="false" style="width:7em"></label>
+          <div class="row"><button id="bOff">Switch off</button><button id="bDelBox">Delete</button></div>
+        </div>
+        <div class="row"><button id="addExit">Add exit</button><button id="addWall">Add wall</button><button id="addZone">Add floor trigger</button><button id="addLos">Add sight blocker</button><button id="addPoint">Add walking point</button><button id="addCam">Add camera limits</button></div>
+        <h2>All boxes on this map</h2>
+        <div class="list" id="boxlist"></div>
+        <div class="muted" style="font-size:12px">New boxes appear in the middle of the view. A map whose boxes or characters were added or deleted is moved to free space at the end of the ROM when you export (a small loader hook makes the game find it).</div>
+      </div>
+      <!-- Objects mode -->
+      <div class="card" data-for="objects" hidden>
+        <h2>Selected character or object</h2>
+        <div id="noobj" class="muted">Click a yellow dot or pick from the list. Drag to move; <kbd>Shift</kbd>+drag to raise.</div>
+        <div id="objsel" hidden style="display:flex;flex-direction:column;gap:10px">
+          <div class="row"><span id="objname" style="font-size:16px"></span><span class="badge mono" id="objtype"></span></div>
+          <div class="row">
+            <label class="field">X <input type="number" id="ox" min="0" max="2047"></label>
+            <label class="field">Y <input type="number" id="oy" min="0" max="2047"></label>
+            <label class="field">Height <input type="number" id="oz" min="0" max="1023"></label>
+          </div>
+          <div class="muted" style="font-size:12px">Only the starting spot changes. Characters that walk a set route or are moved by scripts still do that.</div>
+          <label class="field">Runs script (hex) <input type="text" id="oscript" class="mono" autocomplete="off" spellcheck="false" style="width:7em"></label>
+          <div id="oscriptnote" class="muted" style="font-size:12px"></div>
+          <label class="row" id="ownrow" hidden style="gap:8px;cursor:pointer"><input type="checkbox" id="oown"> <span id="ownlabel">Own save slot</span></label>
+          <div id="ownnote" class="muted" style="font-size:12px"></div>
+          <div id="objshared" class="msg err" hidden></div>
+          <div class="row"><button id="bDelObj">Delete</button></div>
+        </div>
+        <h2>Add a character or object</h2>
+        <input type="search" id="typeq" placeholder="Search: Hitman, Doggie, Door, $0C47…" aria-label="Find a character type">
+        <div class="list" id="typelist" style="max-height:220px"></div>
+        <div class="muted" style="font-size:12px">Anything placed on any map can be copied here; it appears in the middle of the view. Types marked ◆ keep a save slot (health, alive or gone). A copy of one gets its own save slot, so it lives and dies on its own (up to 19 per map, 256 in the whole game; past 24 the save file grows from 8 KB to 16 KB, and old saves still load; not for items or hireable runners). Types without ◆ (doors, fountains, signs, many props) can be copied freely.</div>
+        <h2>Placed on this map</h2>
+        <div class="list" id="objlist"></div>
+      </div>
+      <div class="card">
+        <h2>Map budget</h2>
+        <div class="meters" id="meters"></div>
+        <div class="legend"><span><i style="background:var(--red)"></i>block walls</span><span><i style="background:var(--cyan)"></i>map walls</span><span><i style="background:var(--green)"></i>exits</span><span><i style="background:#b48cff"></i>floor triggers</span><span><i style="background:#ff9f43"></i>sight blockers</span><span><i style="background:#f4f4f4"></i>walking points</span><span><i style="background:var(--yellow)"></i>characters &amp; objects</span></div>
+      </div>
+      <div class="card" data-for="blocks">
+        <div class="row"><h2 class="grow">Building blocks</h2><button id="catUsed" aria-pressed="false">In this map</button></div>
+        <input type="search" id="catq" placeholder="Block number, e.g. 0A3" aria-label="Find a block">
+        <div class="muted" style="font-size:12px">Click a block to drop it in the middle of the view. Blocks from other maps may bring new colours: watch the palette budget.</div>
+        <div class="cat" id="cat"></div>
+      </div>
+      <div class="card" data-for="blocks">
+        <h2>Keys</h2>
+        <div class="keys">
+          <span><kbd>Drag</kbd></span><span>move along the floor</span>
+          <span><kbd>Shift</kbd>+<kbd>Drag</kbd></span><span>raise or lower</span>
+          <span><kbd>←</kbd><kbd>→</kbd></span><span>nudge along Y (up-right / down-left)</span>
+          <span><kbd>↑</kbd><kbd>↓</kbd></span><span>nudge along X (up-left / down-right)</span>
+          <span><kbd>PgUp</kbd><kbd>PgDn</kbd></span><span>height</span>
+          <span><kbd>M</kbd> <kbd>D</kbd> <kbd>Del</kbd></span><span>mirror, duplicate, delete</span>
+        </div>
+      </div>
+    </aside>
+  </main>
+  <div id="status" class="msg" aria-live="polite">Ready.</div>
+</div>
+</div>
+
+<script>/*SRCORE*/</script>
+<script type="application/json" id="mapsdata">/*MAPS*/</script>
+<script type="application/json" id="typeclass">/*TYPECLASS*/</script>
+<script>
+(() => {
+'use strict';
+const MAPS = JSON.parse(document.getElementById('mapsdata').textContent);
+const TC = JSON.parse(document.getElementById('typeclass').textContent), ITEMS = new Set(TC.items), RUNNERS = new Set(TC.runners), SELFREF = new Set(TC.selfref);
+const $ = id => document.getElementById(id);
+const hex = (n, w = 3) => n.toString(16).toUpperCase().padStart(w, '0');
+const clone = o => JSON.parse(JSON.stringify(o));
+const clampv = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.round(+v) || 0));
+let romU8 = null, rom = null, B = null, romName = '', romCrc = 0;
+let cur = null;                 // {loc, n, ptr, lay, md}
+const edits = new Map();        // layout number -> layout (edited)
+const original = new Map();     // layout number -> layout in the loaded ROM
+const mdEdits = new Map();      // map-data pointer -> {loc, md}
+const mdOriginal = new Map();   // map-data pointer -> md in the loaded ROM
+const hist = new Map();         // loc -> {undo:[], redo:[]}
+let mode = 'blocks', sel = null, boxSel = null, objSel = null, brush = 1;
+let zoom = 2, show = { A: true, B: true, coll: false, exit: true, obj: true };
+let cells = null, layoutUse = {}, mdUse = {}, locName = {}, copyTab = new Map();   // copyTab: pointer word -> [{index, id}] (own save slots in the loaded ROM)
+const cv = $('cv'), over = $('over'), ctx = cv.getContext('2d'), octx = over.getContext('2d');
+const img = ctx.createImageData(768, 512);
+const KIND = { walls: ['Map wall', '#3fd6e8'], zones: ['Floor trigger', '#b48cff'], exits: ['Exit', '#59e08a'], los: ['Sight blocker', '#ff9f43'], points: ['Walking point', '#f4f4f4'], cam: ['Camera area', '#f2c94c'] };
+const BOXLISTS = ['exits', 'zones', 'walls', 'los'];
+const isOff = b => b[2] === 0x7FFF && b[5] === 0x7FFF && !b[0] && !b[1] && !b[3] && !b[4];
+
+function status(text, kind) { const s = $('status'); s.textContent = text; s.className = 'msg' + (kind ? ' ' + kind : ''); }
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+const fmtCrc = c => c.toString(16).toUpperCase().padStart(8, '0');
+
+// ------------------------------------------------------------ ROM loading
+async function loadRom(file) {
+  let u8 = new Uint8Array(await file.arrayBuffer());
+  if (u8.length % 0x8000 === 512) u8 = u8.slice(512);
+  const title = String.fromCharCode(...u8.slice(0x7FC0, 0x7FC9));
+  if (title !== 'SHADOWRUN' || u8.length < 0x100000) { status('That file is not a Shadowrun (USA) ROM (title "' + title.trim() + '"). Open the .sfc or .smc file of the US release.', 'err'); return; }
+  romU8 = u8; rom = new SR.Rom(u8); B = new SR.Builder(rom); romName = file.name; romCrc = SR.crc32(u8);
+  edits.clear(); original.clear(); mdEdits.clear(); mdOriginal.clear(); hist.clear(); layoutUse = {}; mdUse = {}; locName = {};
+  copyTab = new Map(); for (const c of SR.readCopyTable(rom)) { if (!copyTab.has(c.pw)) copyTab.set(c.pw, []); copyTab.get(c.pw).push(c); } musicUse = null;
+  for (const m of MAPS) {
+    const n = SR.layoutNumber(rom, m.loc), p = rom.w(0x8D92AF + 9 * m.loc);
+    (layoutUse[n] = layoutUse[n] || []).push(m); (mdUse[p] = mdUse[p] || []).push(m);
+    m.locs.forEach(l => locName[l] = m);
+  }
+  $('romname').textContent = file.name + ' · ' + (u8.length >> 20) + ' MB · CRC ' + fmtCrc(romCrc);
+  $('welcome').hidden = true; $('app').hidden = false; $('projlabel').hidden = false;
+  fillMapSelect(); fillDest(); buildCatalogue(); buildTypes(); fillTypes();
+  openMap(MAPS[1].loc);
+  const saved = store.get('sr-map-edits-' + romCrc);
+  if (saved) { try { const j = JSON.parse(saved); if (Object.keys(j.layouts || {}).length || Object.keys(j.mapdata || {}).length) applyProject(j, true); } catch (e) {} }
+  else status('ROM loaded. Pick a map and a mode.', 'ok');
+}
+$('romfile').onchange = e => { if (e.target.files[0]) loadRom(e.target.files[0]); e.target.value = ''; };
+const welcome = $('welcome');
+['dragenter', 'dragover'].forEach(t => document.addEventListener(t, e => { e.preventDefault(); welcome.classList.add('hot'); }));
+['dragleave', 'drop'].forEach(t => document.addEventListener(t, e => { e.preventDefault(); welcome.classList.remove('hot'); }));
+document.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (!f) return; if (/\.json$/i.test(f.name) && rom) loadProject(f); else loadRom(f); });
+
+// ------------------------------------------------------------ maps
+function isEdited(m) { return edits.has(SR.layoutNumber(rom, m.loc)) || mdEdits.has(rom.w(0x8D92AF + 9 * m.loc)); }
+function mapLabel(m) { return (isEdited(m) ? '● ' : '') + 'Map $' + hex(m.loc) + (m.names.length ? ' · ' + m.names.slice(0, 3).join(', ') : ''); }
+function fillMapSelect() {
+  const q = $('mapq').value.trim().toLowerCase().replace('$', ''); const s = $('mapsel'); const keep = cur && cur.loc; s.textContent = '';
+  for (const m of MAPS) {
+    if (q && !m.locs.some(l => hex(l).toLowerCase() === q) && !m.names.some(x => x.toLowerCase().includes(q))) continue;
+    const o = document.createElement('option'); o.value = m.loc; o.textContent = mapLabel(m); s.appendChild(o);
+  }
+  if (!s.options.length) { const o = document.createElement('option'); o.disabled = true; o.textContent = 'No map matches'; s.appendChild(o); return; }
+  if (keep != null && [...s.options].some(o => +o.value === keep)) s.value = keep;
+}
+function fillDest() {
+  const s = $('bdest'); s.textContent = '';
+  const all = []; MAPS.forEach(m => m.locs.forEach(l => all.push([l, m]))); all.sort((a, b) => a[0] - b[0]);
+  for (const [l, m] of all) { const o = document.createElement('option'); o.value = l; o.textContent = '$' + hex(l) + ' · map $' + hex(m.loc) + (m.names.length ? ' · ' + m.names.slice(0, 2).join(', ') : ''); s.appendChild(o); }
+}
+$('mapq').oninput = () => { fillMapSelect(); const s = $('mapsel'); if (s.options.length && !s.options[0].disabled && +s.value !== (cur && cur.loc)) openMap(+s.value); };
+$('mapsel').onchange = () => openMap(+$('mapsel').value);
+
+function openMap(loc) {
+  const n = SR.layoutNumber(rom, loc), ptr = rom.w(0x8D92AF + 9 * loc);
+  if (!original.has(n)) original.set(n, SR.readLayout(rom, n));
+  if (!mdOriginal.has(ptr)) mdOriginal.set(ptr, readMd(loc));
+  const lay = edits.has(n) ? edits.get(n) : clone(original.get(n));
+  const md = mdEdits.has(ptr) ? mdEdits.get(ptr).md : clone(mdOriginal.get(ptr));
+  cur = { loc, n, ptr, lay, md, meta: MAPS.find(m => m.loc === loc) };
+  sel = boxSel = objSel = null;
+  $('mapsel').value = loc;
+  const users = (layoutUse[n] || []).filter(m => m.loc !== loc);
+  $('shared').textContent = 'Layout $' + hex(n, 2) + (users.length ? ' · its blocks and floor are shared with map ' + users.map(m => '$' + hex(m.loc)).join(', ') : '');
+  buildPalette(); fillTsets(); fillMusic(); render(); panels(); refreshCatalogue(); histButtons();
+  const st = $('stage'); st.scrollLeft = (768 * zoom - st.clientWidth) / 2; st.scrollTop = (512 * zoom - st.clientHeight) / 2;
+}
+
+// ------------------------------------------------------------ edits + history
+function H() { if (!hist.has(cur.loc)) hist.set(cur.loc, { undo: [], redo: [] }); return hist.get(cur.loc); }
+function snapshot() { return JSON.stringify({ layers: cur.lay.layers, fgrid: cur.lay.fgrid || null, tset: cur.lay.tset, md: cur.md }); }
+function restore(s) { const j = JSON.parse(s); cur.lay.layers = j.layers; if (j.tset != null) cur.lay.tset = j.tset; if (j.fgrid) cur.lay.fgrid = j.fgrid; else delete cur.lay.fgrid; cur.md = j.md; }
+let pending = null;
+function beginChange() { if (pending == null) pending = snapshot(); }
+function commit() {
+  if (pending == null) return;
+  const now = snapshot();
+  if (now !== pending) { const h = H(); h.undo.push(pending); if (h.undo.length > 300) h.undo.shift(); h.redo = []; markEdited(); }
+  pending = null; histButtons();
+}
+function change(fn) { beginChange(); fn(); commit(); render(); panels(); }
+function sameFloor() {
+  if (!cur.lay.fgrid) return true;
+  return JSON.stringify(cur.lay.fgrid) === JSON.stringify(SR.floorGrid(rom, original.get(cur.n)));
+}
+function markEdited() {
+  const o = original.get(cur.n);
+  if (cur.lay.fgrid && sameFloor()) delete cur.lay.fgrid;
+  if (JSON.stringify(cur.lay.layers) === JSON.stringify(o.layers) && !cur.lay.fgrid && cur.lay.tset === o.tset) edits.delete(cur.n); else edits.set(cur.n, cur.lay);
+  if (JSON.stringify(cur.md) === JSON.stringify(mdOriginal.get(cur.ptr))) mdEdits.delete(cur.ptr); else mdEdits.set(cur.ptr, { loc: cur.loc, md: cur.md });
+  const opt = [...$('mapsel').options].find(x => +x.value === cur.loc); if (opt) opt.textContent = mapLabel(cur.meta);
+  $('saveproj').disabled = !(edits.size || mdEdits.size);
+  histButtons(); autosave();
+}
+function autosave() { store.set('sr-map-edits-' + romCrc, JSON.stringify(projectJson())); }
+function histButtons() { const h = H(); $('undo').disabled = !h.undo.length; $('redo').disabled = !h.redo.length; $('revert').disabled = !(edits.has(cur.n) || mdEdits.has(cur.ptr)); }
+function undo() { const h = H(); if (!h.undo.length) return; h.redo.push(snapshot()); restore(h.undo.pop()); sel = boxSel = objSel = null; markEdited(); buildPalette(); fillTsets(); fillMusic(); render(); panels(); }
+function redo() { const h = H(); if (!h.redo.length) return; h.undo.push(snapshot()); restore(h.redo.pop()); sel = boxSel = objSel = null; markEdited(); buildPalette(); fillTsets(); fillMusic(); render(); panels(); }
+$('undo').onclick = undo; $('redo').onclick = redo;
+$('revert').onclick = () => { change(() => { cur.lay.layers = clone(original.get(cur.n).layers); delete cur.lay.fgrid; cur.md = clone(mdOriginal.get(cur.ptr)); sel = boxSel = objSel = null; }); fillMusic(); fillTsets(); buildPalette(); status('Map $' + hex(cur.loc) + ' is back to how it is in the ROM. Undo brings your changes back.'); };
+
+// ------------------------------------------------------------ modes
+document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => setMode(b.dataset.mode));
+function setMode(m) {
+  mode = m; document.querySelectorAll('[data-mode]').forEach(x => x.setAttribute('aria-pressed', x.dataset.mode === m));
+  document.querySelectorAll('[data-for]').forEach(c => c.hidden = c.dataset.for !== m);
+  if (m === 'boxes' && !show.exit) { show.exit = true; $('oExit').setAttribute('aria-pressed', true); }
+  if (m === 'objects' && !show.obj) { show.obj = true; $('oObj').setAttribute('aria-pressed', true); }
+  over.style.cursor = m === 'floor' ? 'crosshair' : 'default';
+  render(); panels();
+}
+
+// ------------------------------------------------------------ render
+function render() {
+  cells = B.build(cur.lay);
+  img.data.fill(0); for (let i = 3; i < img.data.length; i += 4) img.data[i] = 255;
+  const layers = []; if (show.A) layers.push(0); if (show.B) layers.push(1);
+  for (const li of layers) B.draw(cells, [li], img.data, null);
+  ctx.putImageData(img, 0, 0);
+  drawOverlay(); meters();
+}
+function piece(s) { return s ? cur.lay.layers[s.li][s.k] : null; }
+const P = SR.project;
+function boxPts(b) { const [x1, y1, z1, x2, y2, z2] = b; const pts = []; for (const z of [z1, z2]) for (const [X, Y] of [[x1, y1], [x2, y1], [x2, y2], [x1, y2]]) pts.push(P(X, Y, z)); return pts; }
+function hull(pts) {
+  const p = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]); if (p.length < 3) return p;
+  const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]); const lo = [], up = [];
+  for (const q of p) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
+  for (const q of p.reverse()) { while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
+  return lo.slice(0, -1).concat(up.slice(0, -1));
+}
+function inPoly(pt, poly) { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, yi] = poly[i], [xj, yj] = poly[j]; if (((yi > pt[1]) !== (yj > pt[1])) && pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi) c = !c; } return c; }
+function area(poly) { let s = 0; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) s += (poly[j][0] + poly[i][0]) * (poly[j][1] - poly[i][1]); return Math.abs(s / 2); }
+
+function drawOverlay() {
+  const z = zoom; over.width = 768 * z; over.height = 512 * z; cv.style.width = 768 * z + 'px'; cv.style.height = 512 * z + 'px';
+  octx.setTransform(z, 0, 0, z, 0, 0); octx.lineWidth = 1 / z;
+  const box = (b, color, label, width) => {
+    const [x1, y1, z1, x2, y2, z2] = b; octx.strokeStyle = color; octx.lineWidth = (width || 1) / z; octx.beginPath();
+    for (const zz of [z1, z2]) { const q = [P(x1, y1, zz), P(x2, y1, zz), P(x2, y2, zz), P(x1, y2, zz)]; octx.moveTo(...q[0]); q.slice(1).forEach(p => octx.lineTo(...p)); octx.closePath(); }
+    for (const [X, Y] of [[x1, y1], [x2, y1], [x2, y2], [x1, y2]]) { octx.moveTo(...P(X, Y, z1)); octx.lineTo(...P(X, Y, z2)); }
+    octx.stroke();
+    if (label) { const [lx, ly] = P((x1 + x2) / 2, (y1 + y2) / 2, z2); octx.fillStyle = color; octx.font = (11 / z) + 'px IBM Plex Mono, monospace'; octx.fillText(label, lx - 12 / z, ly - 3 / z); }
+  };
+  if (mode === 'floor') {
+    octx.strokeStyle = 'rgba(255,255,255,.12)'; octx.beginPath();
+    for (let c = 0; c <= 24; c++) { octx.moveTo(c * 32, 0); octx.lineTo(c * 32, 512); }
+    for (let r = 0; r <= 32; r++) { octx.moveTo(0, r * 16); octx.lineTo(768, r * 16); }
+    octx.stroke();
+    if (hover) { octx.strokeStyle = '#ff4f9a'; octx.lineWidth = 2 / z; octx.strokeRect(hover[0] * 32, hover[1] * 16, 32, 16); }
+  }
+  if (show.coll) cur.lay.layers.forEach(l => l.forEach(pc => SR.pieceBoxes(rom, pc).forEach(b => box(b, 'rgba(255,107,94,.85)'))));
+  if (show.coll || mode === 'boxes') cur.md.walls.forEach((b, i) => { if (!isOff(b)) box(b, 'rgba(63,214,232,.8)'); });
+  if (mode === 'boxes') cur.md.zones.forEach(b => { if (!isOff(b)) box(b, 'rgba(180,140,255,.85)'); });
+  if (show.exit) cur.md.exits.forEach(b => { if (!isOff(b)) box(b, '#59e08a', '→$' + hex(b[6])); });
+  if (mode === 'boxes') {
+    cur.md.los.forEach(b => { if (!isOff(b)) box(b, 'rgba(255,159,67,.9)'); });
+    if (cur.md.camBox) { const [x1, y1, x2, y2] = cur.md.camBox, zz = floorZ(), q = [P(x1, y1, zz), P(x2, y1, zz), P(x2, y2, zz), P(x1, y2, zz)], on = boxSel && boxSel.list === 'cam';
+      octx.save(); octx.setLineDash([6 / z, 4 / z]); octx.strokeStyle = on ? '#ff4f9a' : '#f2c94c'; octx.lineWidth = (on ? 2.5 : 1.5) / z; octx.beginPath(); octx.moveTo(...q[0]); q.slice(1).forEach(p => octx.lineTo(...p)); octx.closePath(); octx.stroke(); octx.restore();
+      octx.fillStyle = on ? '#ff4f9a' : '#f2c94c'; octx.font = (11 / z) + 'px IBM Plex Mono, monospace'; octx.fillText('camera', q[2][0] + 4 / z, q[2][1]); }
+    cur.md.points.forEach((p, i) => { const [px, py] = P(p[0], p[1], p[2]), on = boxSel && boxSel.list === 'points' && boxSel.i === i, r = (on ? 5 : 3.5) / Math.max(1, z / 2);
+      octx.fillStyle = on ? '#ff4f9a' : '#f4f4f4'; octx.beginPath(); octx.moveTo(px, py - r); octx.lineTo(px + r, py); octx.lineTo(px, py + r); octx.lineTo(px - r, py); octx.closePath(); octx.fill();
+      octx.font = (10 / z) + 'px IBM Plex Mono, monospace'; octx.fillText(String(i), px + r + 1, py - 2); });
+  }
+  if (show.obj) cur.md.objects.forEach((o, i) => {
+    const [px, py] = P(o.x, o.y, o.z); const on = mode === 'objects' && objSel === i;
+    octx.fillStyle = on ? '#ff4f9a' : '#f2c94c'; octx.beginPath(); octx.arc(px, py, on ? 4.5 : 3, 0, 7); octx.fill();
+    if (mode === 'objects') { const nm = objName(i); if (nm) { octx.font = (10 / z) + 'px IBM Plex Sans, sans-serif'; octx.fillStyle = on ? '#ff4f9a' : 'rgba(242,201,76,.9)'; octx.fillText(nm, px + 5, py - 4); } }
+  });
+  if (mode === 'boxes' && boxSel && boxSel.list !== 'points' && boxSel.list !== 'cam') { const b = cur.md[boxSel.list][boxSel.i]; if (!isOff(b)) box(b, '#ff4f9a', null, 2); }
+  const pc = mode === 'blocks' ? piece(sel) : null;
+  if (pc) {
+    const one = new Array(96 * 64).fill(null); const TB = thumbB(); TB.palSlots = []; TB.placePiece(pc, one, 0);
+    const has = k => k >= 0 && k < one.length && one[k];
+    octx.strokeStyle = '#ff4f9a'; octx.lineWidth = 2 / z; octx.beginPath();
+    for (let k = 0; k < one.length; k++) {
+      if (!one[k]) continue; const c = Math.floor(k / 64), r = k % 64, x = c * 8, y = r * 8;
+      if (r === 0 || !has(k - 1)) { octx.moveTo(x, y); octx.lineTo(x + 8, y); }
+      if (r === 63 || !has(k + 1)) { octx.moveTo(x, y + 8); octx.lineTo(x + 8, y + 8); }
+      if (!has(k - 64)) { octx.moveTo(x, y); octx.lineTo(x, y + 8); }
+      if (!has(k + 64)) { octx.moveTo(x + 8, y); octx.lineTo(x + 8, y + 8); }
+    }
+    octx.stroke();
+    SR.pieceBoxes(rom, pc).forEach(b => box(b, '#ff4f9a'));
+  }
+}
+
+// ------------------------------------------------------------ budget
+const checkB = () => (checkB.rom === rom ? checkB.b : (checkB.rom = rom, problems.memo = null, checkB.b = new SR.Builder(rom)));
+function problems() {
+  const out = [];
+  for (const [n, lay] of edits) {
+    const key = JSON.stringify([lay.layers, lay.fgrid || 0, [...mdEdits.keys()]]), memo = problems.memo || (problems.memo = new Map()), hit = memo.get(n);
+    if (hit && hit.key === key) { out.push(...hit.out); continue; }
+    const mine = [];
+    for (const m of (layoutUse[n] || [])) {
+      const p = rom.w(0x8D92AF + 9 * m.loc), md = mdEdits.has(p) ? mdEdits.get(p).md : SR.readMapData(rom, m.loc);
+      const r = SR.overLimits(rom, lay, md, checkB());
+      if (r.over.length) mine.push('map $' + hex(m.loc) + ' (' + r.over.join(', ') + ')');
+    }
+    memo.set(n, { key, out: mine }); out.push(...mine);
+  }
+  return out;
+}
+function meters() {
+  const r = SR.overLimits(rom, cur.lay, cur.md, checkB()), s = r.stats, L = SR.LIMITS;
+  const rows = [['Tiles', s.tiles, L.tiles], ['Palettes', s.palettes, L.palettes], ['Layout data', s.bytes, L.bytes], ['Floor runs', s.shapes, L.shapes],
+    ['Wall boxes', s.boxes, L.boxes], ['Back layer', s.layerA, 255], ['Front layer', s.layerB, 255], ['Wall lookups', s.buckets, L.buckets], ['Characters', cur.md.objects.length, 32]];
+  const oc = ownCount(); if (oc[1]) rows.push(['Own save slots', oc[0], SR.CP_POOL], ['… whole game', oc[1], SR.CP_MAX_BIG]);
+  $('meters').innerHTML = '';
+  for (const [name, v, max] of rows) {
+    const f = v / max, cls = f > 1 ? 'over' : f > .9 ? 'warn' : '';
+    const a = document.createElement('span'); a.textContent = name;
+    const b = document.createElement('div'); b.className = 'bar ' + cls; b.innerHTML = '<i></i>'; b.firstChild.style.width = Math.min(100, f * 100) + '%';
+    const c = document.createElement('span'); c.className = 'mono'; c.textContent = v + ' / ' + max;
+    $('meters').append(a, b, c);
+  }
+  const bad = rows.filter(x => x[1] > x[2]).map(x => x[0].toLowerCase()), probs = problems();
+  $('export').disabled = !(edits.size || mdEdits.size) || probs.length > 0;
+  if (bad.length) {
+    const why = bad.includes('tiles') ? 'The game would draw wrong tiles: use fewer different blocks or floor tiles, or fewer mirrored copies. '
+      : bad.includes('palettes') ? 'The game has 7 background palettes per map: remove blocks or floor tiles that bring new colours. ' : 'The game would run out of room: remove some blocks. ';
+    status('This map is over budget on ' + bad.join(', ') + '. ' + why + 'Export stays off until every edited map fits.', 'err');
+  } else if (probs.length) status('Export is off: ' + probs.join('; ') + ' is over budget.', 'err');
+}
+
+// ------------------------------------------------------------ side panels
+function panels() {
+  // blocks
+  const pc = piece(sel); $('nosel').hidden = !!pc; $('sel').hidden = !pc;
+  if (pc) {
+    $('selname').textContent = 'Block $' + hex(pc.p);
+    $('sellayer').textContent = sel.li ? 'Front layer' : 'Back layer';
+    $('selinfo').textContent = '#' + (sel.k + 1) + ' of ' + cur.lay.layers[sel.li].length;
+    $('fx').value = pc.x; $('fy').value = pc.y; $('fz').value = pc.z;
+    $('bMirror').setAttribute('aria-pressed', pc.m);
+    $('bLayer').textContent = sel.li ? 'Move to back layer' : 'Move to front layer';
+    $('selwarn').hidden = !(pc.x < 0 || pc.y < 0 || pc.z < 0);
+  }
+  // boxes
+  const lb = $('boxlist'); lb.textContent = '';
+  for (const list of [...BOXLISTS, 'points']) cur.md[list].forEach((b, i) => {
+    const btn = document.createElement('button'); btn.type = 'button'; const pt = list === 'points';
+    btn.innerHTML = '<span></span><span class="mono"></span>';
+    btn.firstChild.textContent = KIND[list][0] + (list === 'exits' ? ' → $' + hex(b[6]) : list === 'zones' ? ' (script $' + hex(b[6]) + ')' : pt ? ' ' + i : ' ' + (i + 1));
+    btn.lastChild.textContent = !pt && isOff(b) ? 'off' : b[0] + ',' + b[1];
+    if (!pt && isOff(b)) btn.classList.add('off');
+    btn.setAttribute('aria-pressed', !!(boxSel && boxSel.list === list && boxSel.i === i));
+    btn.onclick = () => { boxSel = { list, i }; render(); panels(); };
+    lb.appendChild(btn);
+  });
+  if (cur.md.camBox) { const btn = document.createElement('button'); btn.type = 'button'; btn.innerHTML = '<span>Camera area</span><span class="mono"></span>';
+    btn.lastChild.textContent = cur.md.camBox[0] + ',' + cur.md.camBox[1]; btn.setAttribute('aria-pressed', !!(boxSel && boxSel.list === 'cam')); btn.onclick = () => { boxSel = { list: 'cam', i: 0 }; render(); panels(); }; lb.prepend(btn); }
+  $('addCam').disabled = !!cur.md.camBox;
+  if (!lb.children.length) lb.innerHTML = '<span class="muted">No boxes on this map.</span>';
+  if (boxSel && boxSel.list === 'cam' && !cur.md.camBox) boxSel = null;
+  const b = boxSel ? (boxSel.list === 'cam' ? cur.md.camBox : cur.md[boxSel.list][boxSel.i]) : null; $('nobox').hidden = !!b; $('boxsel').hidden = !b;
+  if (b && boxSel.list === 'cam') {
+    $('boxname').textContent = 'Camera area'; $('boxkind').textContent = 'camera';
+    [['bx1', 0], ['by1', 1], ['bx2', 2], ['by2', 3]].forEach(([id, j]) => { $(id).value = b[j]; $(id).disabled = false; }); $('bz1').value = ''; $('bz2').value = '';
+    $('bz1').closest('label').hidden = true; $('bz2').closest('label').hidden = true;
+    document.querySelectorAll('.boxto').forEach(el => el.hidden = el.contains($('bz2'))); $('bOff').hidden = true; $('destrow').hidden = true; $('scriptrow').hidden = true;
+    $('zoneinfo').textContent = 'The camera follows Jake only while he is inside this area (X from/to, Y from/to, in the same units as the boxes). When he walks out, it stops at the edge, so you can keep the view away from empty parts of the map. Delete it to let the camera follow him everywhere (it still stops at the map\'s borders).';
+  } else if (b) {
+    $('bz1').closest('label').hidden = false; $('bz2').closest('label').hidden = false;
+    const pt = boxSel.list === 'points', off = !pt && isOff(b);
+    $('boxname').textContent = KIND[boxSel.list][0] + ' ' + (pt ? boxSel.i : boxSel.i + 1); $('boxkind').textContent = pt ? 'point' : off ? 'switched off' : 'active';
+    ['bx1', 'by1', 'bz1', 'bx2', 'by2', 'bz2'].forEach((id, j) => { $(id).value = off || (pt && j > 2) ? '' : b[j]; $(id).disabled = off; });
+    document.querySelectorAll('.boxto').forEach(el => el.hidden = pt); $('bOff').hidden = pt;
+    $('destrow').hidden = boxSel.list !== 'exits'; if (boxSel.list === 'exits') $('bdest').value = b[6];
+    $('zoneinfo').textContent = boxSel.list === 'zones' ? 'Runs the script again on every frame while Jake stands inside (see the Script Atlas for what each script does). A new script for a trigger should check and set a story variable if it must happen only once.' : boxSel.list === 'walls' ? 'An invisible wall that is part of the map itself, often the edge of a street.'
+      : boxSel.list === 'los' ? 'Blocks the line between two characters in combat (the attack code checks it before a shot), so nobody shoots through it. It does not stop walking: add a map wall too for that.'
+      : pt ? 'A spot that scripts send characters to by its number (' + boxSel.i + '), e.g. where a guard walks or someone appears. Moving it changes where they go. Points can only be deleted from the end of the list, because scripts count them by number.' : '';
+    $('scriptrow').hidden = boxSel.list !== 'zones'; if (boxSel.list === 'zones') $('bscript').value = '$' + hex(b[6]);
+    $('bOff').textContent = isOff(b) ? 'Switch on' : 'Switch off';
+  }
+  // objects
+  const lo = $('objlist'); lo.textContent = '';
+  cur.md.objects.forEach((o, i) => {
+    const btn = document.createElement('button'); btn.type = 'button'; btn.innerHTML = '<span></span><span class="mono"></span>';
+    btn.firstChild.textContent = objName(i); btn.lastChild.textContent = (o.script != null ? 'script $' + hex(o.script) + ' ' : '') + (isSepItem(o) ? 'item copy ' : isOwn(o) ? 'own ◆ ' : hasRecord(o.type) ? '◆ ' : '') + '$' + hex(baseType(o), 4);
+    btn.setAttribute('aria-pressed', objSel === i); btn.onclick = () => { objSel = i; render(); panels(); }; lo.appendChild(btn);
+  });
+  if (!lo.children.length) lo.innerHTML = '<span class="muted">Nothing is placed on this map.</span>';
+  const o = objSel != null ? cur.md.objects[objSel] : null; $('noobj').hidden = !!o; $('objsel').hidden = !o;
+  if (o) { $('objname').textContent = objName(objSel); $('objtype').textContent = 'type $' + hex(o.type, 4); $('ox').value = o.x; $('oy').value = o.y; $('oz').value = o.z;
+    const rec = hasRecord(o.type), blocked = ownBlocked(o.type), copies = typeUses(baseType(o)), item = isItem(o);
+    $('ownlabel').textContent = item ? 'Separate item' : 'Own save slot';
+    const tsc = SR.typeScript(rom, o.type); $('oscript').value = o.script != null ? '$' + hex(o.script) : ''; $('oscript').placeholder = '$' + hex(tsc);
+    $('oscriptnote').textContent = o.script != null ? 'Runs script $' + hex(o.script) + ' instead of its type\'s $' + hex(tsc) + ' (only this one). Clear the box to go back.'
+      : 'Runs its type\'s script $' + hex(tsc) + ', which makes it talk, fight or walk. Type another number to give only this one a different script, for example a new one from the Script Editor ($400 and up).';
+    const origO = (mdOriginal.get(cur.ptr).objects || [])[objSel], isOrigPlacement = !isSepItem(o) && origO && origO.type === o.type && origO.x === o.x && origO.y === o.y && SR.itemCopyList(rom).indexOf(o.type) < 0 && o.type < SR.TT_FIRST && typeUses(o.type) >= 1 && objSel < (mdOriginal.get(cur.ptr).objects || []).length;
+    if (item) { const self = SELFREF.has(baseType(o)) || isOrigPlacement;
+      $('ownrow').hidden = false; $('oown').checked = isSepItem(o); $('oown').disabled = self && !isSepItem(o);
+      $('ownnote').textContent = isOrigPlacement ? 'This is the game\'s own placement of the item, which the story may look for. Make copies of it separate instead (they are added as separate items).' : self ? 'This item\'s script checks its type by number, so a separate copy would not work right. Copies of it share the original.'
+        : isSepItem(o) ? 'A separate item: it has a type of its own, so picking it up gives a second one in the inventory, under the same name, and the original stays where it is. Up to ' + SR.IT_MAX + ' in the game; they make the save file 16 KB (older saves still load).'
+        : 'Copies of an item are the same item: pick one up and the others are gone. Tick to make this one a separate item.';
+      $('objshared').hidden = !(!isSepItem(o) && copies > 1); $('objshared').textContent = 'This item is placed ' + copies + ' times as the same item: only one of them can ever be picked up. Make the copies separate items to fix that.';
+    } else {
+    $('ownrow').hidden = !rec; $('oown').checked = isOwn(o); $('oown').disabled = !!blocked && !isOwn(o);
+    $('ownnote').textContent = !rec ? '' : blocked === 'item' ? 'This is an item. Items cannot get their own save slot (only the original shows up in the inventory when picked up).'
+      : blocked === 'runner' ? 'This is a hireable runner. Runners cannot get their own save slot (the party keeps track of the original).'
+      : isOwn(o) ? 'This copy keeps its own state: it appears even if the original is gone, and killing it does not touch the original. Its state is kept in your saves.' + (SELFREF.has(o.type) ? ' Note: this character\'s script also checks its type by number, so parts of its behaviour may still follow the original.' : '')
+      : 'The original keeps this save slot. Tick the box to give this copy its own.';
+    $('objshared').hidden = !(rec && !isOwn(o) && copies > 1);
+    $('objshared').textContent = 'This type is placed ' + copies + ' times sharing one save slot. Extra copies may not appear at all, and if one is killed or picked up the others are gone too' + (blocked ? '.' : '. Give the copies their own save slot to fix that.'); } }
+  // floor
+  $('erase').setAttribute('aria-pressed', brush === 0);
+  for (const btn of $('pal').children) btn.setAttribute('aria-pressed', +btn.dataset.v === brush);
+  $('brushname').textContent = brush ? 'Painting with tile ' + brush : 'Erasing';
+}
+
+// block inspector actions
+['fx', 'fy', 'fz'].forEach((id, i) => $(id).onchange = () => { const pc = piece(sel); if (!pc) return;
+  const v = +$(id).value; change(() => { if (i === 0) pc.x = clampv(v, -256, 255); else if (i === 1) pc.y = clampv(v, -256, 255); else pc.z = clampv(v, -128, 127); }); });
+function mirror() { const pc = piece(sel); if (pc) change(() => { pc.m = !pc.m; }); }
+function dup() { const pc = piece(sel); if (!pc) return; change(() => { const L = cur.lay.layers[sel.li]; L.push({ ...pc, x: clampv(pc.x + 4, -256, 255), y: clampv(pc.y + 4, -256, 255) }); sel = { li: sel.li, k: L.length - 1 }; }); }
+function del() { if (!sel) return; change(() => { cur.lay.layers[sel.li].splice(sel.k, 1); sel = null; }); }
+function swapLayer() { const pc = piece(sel); if (!pc) return; change(() => { cur.lay.layers[sel.li].splice(sel.k, 1); const t = 1 - sel.li; cur.lay.layers[t].push(pc); sel = { li: t, k: cur.lay.layers[t].length - 1 }; }); }
+$('bMirror').onclick = mirror; $('bDup').onclick = dup; $('bDel').onclick = del; $('bLayer').onclick = swapLayer;
+// box inspector actions
+['bx1', 'by1', 'bz1', 'bx2', 'by2', 'bz2'].forEach((id, j) => $(id).onchange = () => { if (!boxSel) return;
+  if (boxSel.list === 'points') { if (j < 3) change(() => { cur.md.points[boxSel.i][j] = clampv($(id).value, -2048, 2047); }); return; }
+  if (boxSel.list === 'cam') { const k = { 0: 0, 1: 1, 3: 2, 4: 3 }[j]; if (k == null) return; change(() => { cur.md.camBox[k] = clampv($(id).value, 0, 4000); }); return; }
+  change(() => { const b = cur.md[boxSel.list][boxSel.i]; b[j] = clampv($(id).value, -2048, 2047);
+    if (b[0] > b[3]) [b[0], b[3]] = [b[3], b[0]]; if (b[1] > b[4]) [b[1], b[4]] = [b[4], b[1]]; if (b[2] > b[5]) [b[2], b[5]] = [b[5], b[2]]; }); });
+$('bdest').onchange = () => { if (!boxSel) return; change(() => { cur.md.exits[boxSel.i][6] = +$('bdest').value; }); };
+$('bOff').onclick = () => { if (!boxSel) return; change(() => {
+  const b = cur.md[boxSel.list][boxSel.i], orig = mdOriginal.get(cur.ptr)[boxSel.list][boxSel.i];
+  if (isOff(b)) { const src = !orig || isOff(orig) ? viewBox() : orig; for (let j = 0; j < 6; j++) b[j] = src[j]; }
+  else for (let j = 0; j < 6; j++) b[j] = SR.OFF_BOX[j];
+}); };
+function viewCenterWorld(z0) { const st = $('stage'), cx = (st.scrollLeft + st.clientWidth / 2) / zoom, cy = (st.scrollTop + st.clientHeight / 2) / zoom;
+  const s = 768 - cy - z0, d = cx - 384; return [Math.round(s - d / 2), Math.round(s + d / 2)]; }
+function viewBox() { const [X, Y] = viewCenterWorld(64); return [X - 10, Y - 10, 64, X + 10, Y + 10, 100]; }
+// object inspector actions
+$('oown').onchange = () => { if (objSel == null) return; const on = $('oown').checked;
+  if (isItem(cur.md.objects[objSel])) {
+    if (on && sepItemCount() >= SR.IT_MAX) { $('oown').checked = false; status('The game already has ' + SR.IT_MAX + ' separate item copies, the most this patch has room for.', 'err'); return; }
+    change(() => { const o = cur.md.objects[objSel]; if (on) o.newItem = true; else { if (o.itemOf != null && o.type >= SR.TT_FIRST) o.type = o.itemOf; delete o.itemOf; delete o.newItem; } });
+    status(on ? 'This copy is now a separate item.' : 'This copy is the same item as the original again.', 'ok'); return;
+  }
+  if (on) { const [m, g] = ownCount(); if (m >= SR.CP_POOL || g >= SR.CP_MAX_BIG) { $('oown').checked = false; status(m >= SR.CP_POOL ? 'This map already has ' + SR.CP_POOL + ' copies with their own save slot, the most it can hold.' : 'The game already has ' + SR.CP_MAX_BIG + ' copies with their own save slot, the most a save file has room for.', 'err'); return; } }
+  change(() => { const o = cur.md.objects[objSel]; if (on) o.own = true; else delete o.own; }); };
+[['ox', 'x', 2047], ['oy', 'y', 2047], ['oz', 'z', 1023]].forEach(([id, k, mx]) => $(id).onchange = () => { if (objSel == null) return; change(() => { cur.md.objects[objSel][k] = clampv($(id).value, 0, mx); }); });
+
+// names for objects: the vanilla list matches by position; added ones are named from the type catalogue
+function objName(i) {
+  const o = cur.md.objects[i], orig = mdOriginal.get(cur.ptr).objects, names = cur.meta.objs || [];
+  const k = orig.findIndex((x, j) => x.type === baseType(o) && names[j]);
+  return ((k >= 0 ? names[k] : (TYPES.get(baseType(o)) || {}).name) || 'Object $' + hex(baseType(o), 4)) + (isSepItem(o) ? ' (separate copy)' : '');
+}
+const hasRecord = type => SR.typeRecord(rom, type) !== 0;
+// separate item copies: an item copy gets a type of its own (srcore installItems), so it is its own inventory entry
+const baseType = o => o.itemOf != null ? o.itemOf : o.type;
+const isItem = o => o.itemOf != null || ITEMS.has(o.type);
+const isSepItem = o => o.itemOf != null || !!o.newItem;
+function sepItemCount() {   // whole game: types already in the ROM + fresh ones in the edits
+  let fresh = 0; const seen = new Set();
+  for (const m of MAPS) { const p = rom.w(0x8D92AF + 9 * m.loc); if (seen.has(p)) continue; seen.add(p);
+    if (p === cur.ptr || mdEdits.has(p)) fresh += mdOf(p, m.loc).objects.filter(o => o.newItem && o.itemOf == null).length; }
+  return SR.itemCopyList(rom).length + fresh;
+}
+// own save slots: copies of ◆ types get a private save record (code in bank $AB, see srcore.js). Not for items (the
+// inventory only lists the real type) or hireable runners (the party keeps the record).
+const ownBlocked = type => ITEMS.has(type) || type >= SR.TT_FIRST ? 'item' : RUNNERS.has(type) ? 'runner' : null;
+const isOwn = o => o.own != null && o.own !== false;
+function readMd(loc) {
+  const md = SR.readMapData(rom, loc), list = copyTab.get(rom.w(0x8D92AF + 9 * loc)) || [];
+  for (const c of list) if (md.objects[c.index]) md.objects[c.index].own = c.id;
+  return md;
+}
+function mdOf(p, loc) { return p === cur.ptr ? cur.md : mdEdits.has(p) ? mdEdits.get(p).md : mdOriginal.get(p) || readMd(loc); }
+function ownCount() {       // [this map, whole game]
+  let all = 0; const seen = new Set();
+  for (const m of MAPS) { const p = rom.w(0x8D92AF + 9 * m.loc); if (seen.has(p)) continue; seen.add(p);
+    all += (p === cur.ptr || mdEdits.has(p)) ? mdOf(p, m.loc).objects.filter(isOwn).length : (copyTab.get(p) || []).length; }
+  return [cur.md.objects.filter(isOwn).length, all];
+}
+function typeUses(type) {    // placements across all maps that share the type's save record (copies with their own slot not counted)
+  let n = 0; const seen = new Set();
+  for (const m of MAPS) { const p = rom.w(0x8D92AF + 9 * m.loc); if (seen.has(p)) continue; seen.add(p);
+    n += mdOf(p, m.loc).objects.filter(o => o.type === type && !isOwn(o) && !isSepItem(o)).length; }
+  return n;
+}
+let TYPES = new Map();
+function buildTypes() {
+  TYPES = new Map(); const seen = new Set();
+  for (const m of MAPS) {
+    const p = rom.w(0x8D92AF + 9 * m.loc); if (seen.has(p)) continue; seen.add(p);
+    let md; try { md = SR.readMapData(rom, m.loc); } catch (e) { continue; }
+    md.objects.forEach((o, i) => { const e = TYPES.get(o.type) || { type: o.type, name: (m.objs || [])[i] || '', maps: [] }; if (!e.name && (m.objs || [])[i]) e.name = m.objs[i]; e.maps.push(m.loc); TYPES.set(o.type, e); });
+  }
+}
+function fillTypes() {
+  const q = $('typeq').value.trim().toLowerCase().replace('$', ''), box = $('typelist'); box.textContent = ''; let n = 0;
+  const list = [...TYPES.values()].filter(e => e.name && !/^area init|^\(/.test(e.name) || q).sort((a, b) => (a.name[0] === '(') - (b.name[0] === '(') || a.name.localeCompare(b.name));
+  for (const e of list) {
+    if (q && !e.name.toLowerCase().includes(q) && hex(e.type, 4).toLowerCase() !== q) continue;
+    const b = document.createElement('button'); b.type = 'button'; b.innerHTML = '<span></span><span class="mono"></span>';
+    b.firstChild.textContent = e.name || 'Type $' + hex(e.type, 4); b.lastChild.textContent = (hasRecord(e.type) ? '◆ ' : '') + '$' + hex(e.type, 4) + ' · map $' + hex(e.maps[0]);
+    b.onclick = () => addObject(e.type); box.appendChild(b); if (++n >= 150) break;
+  }
+  if (!n) box.innerHTML = '<span class="muted">No match.</span>';
+}
+$('typeq').oninput = fillTypes;
+function floorZ() { const zs = cur.md.objects.map(o => o.z).sort((a, b) => a - b); return zs.length ? zs[zs.length >> 1] : 64; }
+function addObject(type) {
+  if (cur.md.objects.length >= 32) { status('This map already has 32 characters and objects, the most the editor allows (the game has a limited pool of 44 for everything on screen).', 'err'); return; }
+  const z = floorZ(), [X, Y] = viewCenterWorld(z);
+  const [m, g] = ownCount(), own = hasRecord(type) && !ownBlocked(type) && m < SR.CP_POOL && g < SR.CP_MAX_BIG;
+  const sep = ITEMS.has(type) && !SELFREF.has(type) && sepItemCount() < SR.IT_MAX;
+  change(() => { const o = { x: clampv(X, 0, 2047), y: clampv(Y, 0, 2047), z, type }; if (own) o.own = true; if (sep) o.newItem = true; cur.md.objects.push(o); objSel = cur.md.objects.length - 1; });
+  status('Added ' + ((TYPES.get(type) || {}).name || 'type $' + hex(type, 4)) + '. Drag it into place.' + (sep ? ' It is a separate item (a second one can be picked up).' : own ? ' It has its own save slot.' : hasRecord(type) ? ' It shares a save slot with the original.' : ''), 'ok');
+}
+$('bDelObj').onclick = () => { if (objSel == null) return; change(() => { cur.md.objects.splice(objSel, 1); objSel = null; }); };
+function addBox(list) {
+  const z = floorZ(), [X, Y] = viewCenterWorld(z), b = [X - 10, Y - 10, z, X + 10, Y + 10, z + 48];
+  if (list === 'exits') b.push(cur.md.exits.length ? cur.md.exits[0][6] : cur.loc);
+  if (list === 'zones') b.push(cur.md.zones.length ? cur.md.zones[0][6] : 0);
+  change(() => { cur.md[list].push(b); boxSel = { list, i: cur.md[list].length - 1 }; });
+  status('Added ' + KIND[list][0].toLowerCase() + '. Drag it into place' + (list === 'exits' ? ' and pick where it leads.' : list === 'zones' ? ' and set its script.' : '.'), 'ok');
+}
+$('addExit').onclick = () => addBox('exits'); $('addWall').onclick = () => addBox('walls'); $('addZone').onclick = () => addBox('zones'); $('addLos').onclick = () => addBox('los');
+$('addPoint').onclick = () => { const z = floorZ(), [X, Y] = viewCenterWorld(z);
+  change(() => { cur.md.points.push([X, Y, z]); boxSel = { list: 'points', i: cur.md.points.length - 1 }; });
+  status('Added walking point ' + (cur.md.points.length - 1) + '. Scripts reach it by that number (edit a script in the Script Editor to use it).', 'ok'); };
+$('addCam').onclick = () => { if (cur.md.camBox) return; const [X, Y] = viewCenterWorld(floorZ());
+  change(() => { cur.md.camBox = [X - 100, Y - 100, X + 100, Y + 100]; boxSel = { list: 'cam', i: 0 }; });
+  status('Added camera limits around the middle of the view. Drag the yellow area or type its edges.', 'ok'); };
+$('bDelBox').onclick = () => { if (!boxSel) return;
+  if (boxSel.list === 'cam') { change(() => { cur.md.camBox = null; boxSel = null; }); status('Camera limits removed: the camera follows Jake everywhere on this map.'); return; }
+  if (boxSel.list === 'points' && boxSel.i !== cur.md.points.length - 1) { status('Only the last walking point can be deleted: scripts refer to points by number, so removing this one would renumber the rest. Move it instead.', 'err'); return; }
+  change(() => { cur.md[boxSel.list].splice(boxSel.i, 1); boxSel = null; }); };
+// script numbers are hex, like the Script Editor and the Script Atlas: 0-$3A7 the game's own, $400 and up new ones
+function parseScript(v) { const t = String(v).trim().replace(/^\$|^0x/i, ''); return /^[0-9a-f]{1,3}$/i.test(t) ? parseInt(t, 16) : null; }
+function scriptProblem(id) {
+  if (id == null) return 'Type a script number in hex, like $1E4 or $400.';
+  if (SR.scriptExists(rom, id)) return null;
+  const n = SR.newScriptCount(rom);
+  return id >= SR.NEW_SCRIPT_BASE ? (n ? (n === 1 ? 'This ROM has only one new script, $400.' : 'This ROM has new scripts $400 to $' + hex(SR.NEW_SCRIPT_BASE + n - 1) + ' only.') : 'This ROM has no new scripts yet. Make them in the Script Editor, apply its patch, then open the patched ROM here.')
+    : 'The game\'s own scripts go from $000 to $3A7.';
+}
+$('bscript').onchange = () => { if (!boxSel || boxSel.list !== 'zones') return; const id = parseScript($('bscript').value), bad = scriptProblem(id);
+  if (bad) { status(bad, 'err'); $('bscript').value = '$' + hex(cur.md.zones[boxSel.i][6]); return; }
+  change(() => { cur.md.zones[boxSel.i][6] = id; }); status('This floor trigger now runs script $' + hex(id) + '.', 'ok'); };
+$('oscript').onchange = () => { if (objSel == null) return; const o = cur.md.objects[objSel], own = SR.typeScript(rom, o.type), v = $('oscript').value.trim();
+  if (!v) { change(() => { delete cur.md.objects[objSel].script; }); status('Back to its type\'s script $' + hex(own) + '.', 'ok'); return; }
+  const id = parseScript(v), bad = scriptProblem(id);
+  if (bad) { status(bad, 'err'); $('oscript').value = o.script != null ? '$' + hex(o.script) : ''; return; }
+  change(() => { const x = cur.md.objects[objSel]; if (id === own) delete x.script; else x.script = id; });
+  status(id === own ? 'That is its type\'s own script, so nothing changes.' : 'This one runs script $' + hex(id) + ' instead of $' + hex(own) + '. Others of its type are not affected.', 'ok'); };
+
+// ------------------------------------------------------------ mouse
+function mapPos(e) { const r = over.getBoundingClientRect(); return [(e.clientX - r.left) / zoom, (e.clientY - r.top) / zoom]; }
+function pickList(px, py) {
+  const col = Math.floor(px / 8), row = Math.floor(py / 8); if (col < 0 || col > 95 || row < 0 || row > 63) return [];
+  const k = col * 64 + row, list = [];
+  for (const li of [1, 0]) { if (li === 1 && !show.B || li === 0 && !show.A) continue; const c = cells[li][k]; if (!c) continue;
+    for (let i = c.o.length - 1; i >= 0; i--) if (c.o[i] >= 0 && !list.includes(c.o[i])) list.push(c.o[i]); }
+  return list;
+}
+function pickBox(px, py) {
+  let best = null, bp = null;
+  cur.md.points.forEach((p, i) => { const [x, y] = P(p[0], p[1], p[2]), d = Math.hypot(x - px, y - py); if (d < 6 && (!bp || d < bp.d)) bp = { i, d }; });
+  if (bp) return { list: 'points', i: bp.i };
+  for (const list of BOXLISTS) cur.md[list].forEach((b, i) => {
+    if (isOff(b)) return; const h = hull(boxPts(b)); if (!inPoly([px, py], h)) return; const a = area(h);
+    if (!best || a < best.a) best = { list, i, a };
+  });
+  if (!best && cur.md.camBox) { const [x1, y1, x2, y2] = cur.md.camBox, zz = floorZ(); if (inPoly([px, py], [P(x1, y1, zz), P(x2, y1, zz), P(x2, y2, zz), P(x1, y2, zz)])) return { list: 'cam', i: 0 }; }
+  return best && { list: best.list, i: best.i };
+}
+function pickObj(px, py) { let best = null; cur.md.objects.forEach((o, i) => { const [x, y] = P(o.x, o.y, o.z), d = Math.hypot(x - px, y - py); if (d < 7 && (!best || d < best.d)) best = { i, d }; }); return best && best.i; }
+const idOf = s => s.li * 1000 + s.k, fromId = id => ({ li: Math.floor(id / 1000), k: id % 1000 });
+let drag = null, hover = null, raf = 0;
+const redraw = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; render(); panels(); }); };
+function floorCell(px, py) { const c = Math.floor(px / 32), r = Math.floor(py / 16); return c >= 0 && c < 24 && r >= 0 && r < 32 ? [c, r] : null; }
+function paint(cell) {
+  if (!cell) return; if (!cur.lay.fgrid) cur.lay.fgrid = SR.floorGrid(rom, cur.lay);
+  const k = cell[0] * 32 + cell[1]; if (cur.lay.fgrid[k] === brush) return; cur.lay.fgrid[k] = brush; redraw();
+}
+over.addEventListener('contextmenu', e => { if (mode === 'floor') e.preventDefault(); });
+over.addEventListener('pointerdown', e => {
+  const [px, py] = mapPos(e);
+  if (mode === 'floor') {
+    const cell = floorCell(px, py); if (!cell) return;
+    if (e.altKey || e.button === 2) { const g = cur.lay.fgrid || SR.floorGrid(rom, cur.lay); brush = g[cell[0] * 32 + cell[1]]; panels(); return; }
+    if (e.button !== 0) return;
+    beginChange(); drag = { floor: true }; paint(cell); over.setPointerCapture(e.pointerId); return;
+  }
+  if (e.button !== 0) return;
+  if (mode === 'boxes') {
+    const hit = pickBox(px, py); boxSel = hit; render(); panels();
+    if (hit) { const b = hit.list === 'cam' ? cur.md.camBox : cur.md[hit.list][hit.i]; drag = { sx: px, sy: py, b0: b.slice(), moved: false }; over.setPointerCapture(e.pointerId); }
+    return;
+  }
+  if (mode === 'objects') {
+    const hit = pickObj(px, py); objSel = hit; render(); panels();
+    if (hit != null) { const o = cur.md.objects[hit]; drag = { sx: px, sy: py, o0: { ...o }, moved: false }; over.setPointerCapture(e.pointerId); }
+    return;
+  }
+  const list = pickList(px, py), inList = sel && list.includes(idOf(sel));
+  if (!inList) sel = list.length ? fromId(list[0]) : null;
+  render(); panels();
+  const pc = piece(sel);
+  if (pc) { drag = { sx: px, sy: py, x: pc.x, y: pc.y, z: pc.z, moved: false, list, cycle: inList }; over.setPointerCapture(e.pointerId); }
+});
+over.addEventListener('pointermove', e => {
+  const [px, py] = mapPos(e);
+  if (mode === 'floor') { const c = floorCell(px, py); if (String(c) !== String(hover)) { hover = c; if (drag && drag.floor) paint(c); else redraw(); } return; }
+  if (!drag) return;
+  const dx = px - drag.sx, dy = py - drag.sy;
+  if (!drag.moved && Math.abs(dx) + Math.abs(dy) < 3) return;
+  if (!drag.moved) { beginChange(); drag.moved = true; }
+  if (mode === 'boxes' && boxSel && boxSel.list === 'cam') {
+    const c = cur.md.camBox, b0 = drag.b0, dX = Math.round(-dy - dx / 2), dY = Math.round(-dy + dx / 2);
+    c[0] = b0[0] + dX; c[2] = b0[2] + dX; c[1] = b0[1] + dY; c[3] = b0[3] + dY;
+  } else if (mode === 'boxes' && boxSel && boxSel.list === 'points') {
+    const p = cur.md.points[boxSel.i], b0 = drag.b0;
+    if (e.shiftKey) { p[2] = b0[2] - Math.round(dy); p[0] = b0[0]; p[1] = b0[1]; }
+    else { p[0] = Math.round(b0[0] - dy - dx / 2); p[1] = Math.round(b0[1] - dy + dx / 2); p[2] = b0[2]; }
+  } else if (mode === 'boxes' && boxSel) {
+    const b = cur.md[boxSel.list][boxSel.i], b0 = drag.b0;
+    if (e.shiftKey) { const dz = -Math.round(dy); b[2] = b0[2] + dz; b[5] = b0[5] + dz; for (const j of [0, 1, 3, 4]) b[j] = b0[j]; }
+    else { const dX = Math.round(-dy - dx / 2), dY = Math.round(-dy + dx / 2); b[0] = b0[0] + dX; b[3] = b0[3] + dX; b[1] = b0[1] + dY; b[4] = b0[4] + dY; b[2] = b0[2]; b[5] = b0[5]; }
+  } else if (mode === 'objects' && objSel != null) {
+    const o = cur.md.objects[objSel], o0 = drag.o0;
+    if (e.shiftKey) { o.z = clampv(o0.z - dy, 0, 1023); o.x = o0.x; o.y = o0.y; }
+    else { o.x = clampv(o0.x - dy - dx / 2, 0, 2047); o.y = clampv(o0.y - dy + dx / 2, 0, 2047); o.z = o0.z; }
+  } else if (mode === 'blocks') {
+    const pc = piece(sel); if (!pc) return;
+    if (e.shiftKey) { pc.z = clampv(drag.z - dy / 8, -128, 127); pc.x = drag.x; pc.y = drag.y; }
+    else { pc.x = clampv(drag.x - dy / 4 - dx / 8, -256, 255); pc.y = clampv(drag.y + dx / 8 - dy / 4, -256, 255); pc.z = drag.z; }
+  }
+  redraw();
+});
+over.addEventListener('pointerleave', () => { if (mode === 'floor' && !drag) { hover = null; redraw(); } });
+const endDrag = () => {
+  if (drag && (drag.moved || drag.floor)) commit();
+  else if (drag && drag.cycle && drag.list.length > 1) { const i = drag.list.indexOf(idOf(sel)); sel = fromId(drag.list[(i + 1) % drag.list.length]); render(); panels(); }
+  drag = null;
+};
+over.addEventListener('pointerup', endDrag); over.addEventListener('pointercancel', endDrag);
+
+document.addEventListener('keydown', e => {
+  if (!cur || /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); return; }
+  const mv = { ArrowRight: [0, 1, 0], ArrowLeft: [0, -1, 0], ArrowUp: [1, 0, 0], ArrowDown: [-1, 0, 0], PageUp: [0, 0, 1], PageDown: [0, 0, -1] }[e.key];
+  if (mode === 'boxes' && boxSel && boxSel.list === 'cam' && mv) { e.preventDefault(); change(() => { const c = cur.md.camBox; c[0] += mv[0]; c[2] += mv[0]; c[1] += mv[1]; c[3] += mv[1]; }); return; }
+  if (mode === 'boxes' && boxSel && boxSel.list === 'points' && mv) { e.preventDefault(); change(() => { const p = cur.md.points[boxSel.i]; for (let j = 0; j < 3; j++) p[j] += mv[j]; }); return; }
+  if (mode === 'boxes' && boxSel && mv) { e.preventDefault(); change(() => { const b = cur.md[boxSel.list][boxSel.i]; if (isOff(b)) return; for (let j = 0; j < 2; j++) { b[j * 3] += mv[0]; b[j * 3 + 1] += mv[1]; b[j * 3 + 2] += mv[2]; } }); return; }
+  if (mode === 'objects' && objSel != null && mv) { e.preventDefault(); change(() => { const o = cur.md.objects[objSel]; o.x = clampv(o.x + mv[0], 0, 2047); o.y = clampv(o.y + mv[1], 0, 2047); o.z = clampv(o.z + mv[2], 0, 1023); }); return; }
+  if (mode !== 'blocks') { if (e.key === 'Escape') { boxSel = objSel = null; render(); panels(); } return; }
+  const pc = piece(sel); if (!pc) return;
+  if (mv) { e.preventDefault(); change(() => { pc.x = clampv(pc.x + mv[0], -256, 255); pc.y = clampv(pc.y + mv[1], -256, 255); pc.z = clampv(pc.z + mv[2], -128, 127); }); return; }
+  if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); del(); }
+  else if (e.key.toLowerCase() === 'm') mirror();
+  else if (e.key.toLowerCase() === 'd') dup();
+  else if (e.key === 'Escape') { sel = null; render(); panels(); }
+});
+
+// ------------------------------------------------------------ view toggles
+const tog = (id, key) => $(id).onclick = () => { show[key] = !show[key]; $(id).setAttribute('aria-pressed', show[key]); render(); };
+tog('vA', 'A'); tog('vB', 'B'); tog('oColl', 'coll'); tog('oExit', 'exit'); tog('oObj', 'obj');
+document.querySelectorAll('[data-z]').forEach(b => b.onclick = () => {
+  const st = $('stage'), cx = (st.scrollLeft + st.clientWidth / 2) / zoom, cy = (st.scrollTop + st.clientHeight / 2) / zoom;
+  zoom = +b.dataset.z; document.querySelectorAll('[data-z]').forEach(x => x.setAttribute('aria-pressed', x === b)); if (cur) render();
+  st.scrollLeft = cx * zoom - st.clientWidth / 2; st.scrollTop = cy * zoom - st.clientHeight / 2;
+});
+
+// ------------------------------------------------------------ floor palette
+const TSET_NAMES = ['set 0', 'set 1', 'set 2', 'set 3', 'set 4', 'set 5'];
+function buildPalette() {
+  const pal = $('pal'), t = cur.lay.tset; if (pal.dataset.tset === String(t) && pal.dataset.rom === String(romCrc)) return;
+  pal.dataset.tset = t; pal.dataset.rom = romCrc; pal.textContent = ''; $('tsetname').textContent = 'tile set ' + t;
+  const n = SR.metatileCount(rom, t), p11 = 0x8D0000 | rom.w(0x8DF1B2 + 2 * t), p14 = 0x8D0000 | rom.w(0x8DF1BE + 2 * t), TB = thumbB();
+  for (let v = 1; v < n; v++) {
+    const btn = document.createElement('button'); btn.type = 'button'; btn.dataset.v = v; btn.title = 'Floor tile ' + v;
+    btn.innerHTML = '<canvas width="32" height="16"></canvas><span>' + v + '</span>';
+    const g = btn.firstChild.getContext('2d'), id = g.createImageData(32, 16), Pl = TB.palette(rom.b(p14 + v));
+    for (let i = 0; i < 8; i++) {
+      const t16 = rom.w(p11 + v * 16 + 2 * i); if (!t16) continue;
+      const ti = TB.tile(t16), hf = t16 & 0x4000, vf = t16 & 0x8000, cx = (i & 3) * 8, cy = (i >> 2) * 8;
+      for (let yy = 0; yy < 8; yy++) for (let xx = 0; xx < 8; xx++) { const c = ti[(vf ? 7 - yy : yy) * 8 + (hf ? 7 - xx : xx)]; if (!c) continue; const o = ((cy + yy) * 32 + cx + xx) * 4; id.data[o] = Pl[c][0]; id.data[o + 1] = Pl[c][1]; id.data[o + 2] = Pl[c][2]; id.data[o + 3] = 255; }
+    }
+    g.putImageData(id, 0, 0);
+    btn.onclick = () => { brush = v; panels(); };
+    pal.appendChild(btn);
+  }
+  if (brush >= n) brush = 1;
+}
+$('erase').onclick = () => { brush = 0; panels(); };
+// music: map data byte +1. Map load ($80A484): $FF keeps the current song; another value fades out and starts that
+// song ($81EF08 -> $1CFA). Songs 1-12 exist (13+ play nothing or noise, checked by recording the emulator's audio);
+// 6 is also the battle music (combat start saves the map's song in $1FE6 and restores it).
+const SONG = { 1: 'streets', 2: 'clubs', 3: 'ghouls & spirits', 4: 'indoors, hotel', 5: 'club (bouncer)', 6: 'battle music', 7: 'morgue, doc, arena', 8: 'not used by maps', 9: 'not used by maps', 10: 'not used by maps', 11: 'not used by maps', 12: 'corporate towers' };
+let musicUse = null;
+function fillMusic() {
+  if (!musicUse) { musicUse = {}; const seen = new Set();
+    for (const m of MAPS) { const p = rom.w(0x8D92AF + 9 * m.loc); if (seen.has(p)) continue; seen.add(p); const v = (mdOriginal.get(p) || readMd(m.loc)).music; (musicUse[v] = musicUse[v] || []).push(m.loc); } }
+  const s = $('music'), v = cur.md.music; s.textContent = '';
+  const opt = (val, label) => { const o = document.createElement('option'); o.value = val; o.textContent = label; s.appendChild(o); };
+  opt(255, 'Keep the music that is playing');
+  opt(0, 'Silence');
+  for (let k = 1; k <= 12; k++) { const u = musicUse[k] || []; opt(k, 'Song ' + k + ' · ' + SONG[k] + (u.length ? ' (like map ' + u.slice(0, 2).map(l => '$' + hex(l)).join(', ') + ')' : '')); }
+  if (![0, 255].includes(v) && !(v >= 1 && v <= 12)) opt(v, 'Value ' + v + ' (as in the ROM; plays nothing)');
+  s.value = v; const o = mdOriginal.get(cur.ptr).music; s.title = v !== o ? 'Changed from ' + (o === 255 ? 'keep playing' : 'song ' + o) : '';
+}
+$('music').onchange = () => { const v = +$('music').value; change(() => { cur.md.music = v; }); fillMusic();
+  status(v === 255 ? 'This map now keeps whatever music was playing.' : v === 0 ? 'This map now stops the music.' : 'This map now plays song ' + v + '.' + ((mdUse[cur.ptr] || []).length > 1 ? ' Its map data is shared with map ' + mdUse[cur.ptr].filter(m => m.loc !== cur.loc).map(m => '$' + hex(m.loc)).join(', ') + ', which change too.' : ''), 'ok'); };
+// floor tile set: the layout's tile set byte only picks which metatile table the floor reads ($8DF1B2/$8DF1BE at
+// $81A158); blocks are unaffected. Floor cells whose tile number the new set does not have are erased.
+function fillTsets() {
+  const s = $('tsetsel'), t = cur.lay.tset; s.textContent = '';
+  for (let k = 0; k < 6; k++) {
+    const users = []; for (const [n, list] of Object.entries(layoutUse)) { const l = original.get(+n) || (original.set(+n, SR.readLayout(rom, +n)), original.get(+n)); if (l.tset === k) users.push(...list.map(m => '$' + hex(m.loc))); }
+    const o = document.createElement('option'); o.value = k; o.textContent = 'Set ' + k + ' · ' + (SR.metatileCount(rom, k) - 1) + ' tiles' + (users.length ? ' · like map ' + users.slice(0, 3).join(', ') : ''); s.appendChild(o);
+  }
+  s.value = t;
+  const o = original.get(cur.n).tset;
+  $('tsetnote').textContent = (t !== o ? 'Changed from set ' + o + '. ' : '') + ((layoutUse[cur.n] || []).length > 1 ? 'The floor is shared with map ' + layoutUse[cur.n].filter(m => m.loc !== cur.loc).map(m => '$' + hex(m.loc)).join(', ') + ', so it changes there too.' : '');
+}
+$('tsetsel').onchange = () => {
+  const v = +$('tsetsel').value, n = SR.metatileCount(rom, v); let lost = 0;
+  change(() => { if (!cur.lay.fgrid) cur.lay.fgrid = SR.floorGrid(rom, cur.lay);
+    cur.lay.fgrid = cur.lay.fgrid.map(x => { if (x >= n) { lost++; return 0; } return x; }); cur.lay.tset = v; });
+  buildPalette(); fillTsets();
+  status('Floor now uses tile set ' + v + '.' + (lost ? ' ' + lost + ' floor cell' + (lost === 1 ? '' : 's') + ' used tiles this set does not have and were erased.' : ' Same tile numbers, new look: repaint where needed.'), lost ? 'err' : 'ok');
+};
+
+// ------------------------------------------------------------ catalogue
+let pieceList = [], catObs = null;
+function buildCatalogue() {
+  const used = new Set();
+  for (let n = 0; n < 165; n++) { try { SR.readLayout(rom, n).layers.forEach(l => l.forEach(pc => used.add(pc.p))); } catch (e) {} }
+  pieceList = [...used].sort((a, b) => a - b);
+  const cat = $('cat'); cat.textContent = '';
+  catObs && catObs.disconnect();
+  catObs = new IntersectionObserver(es => es.forEach(en => { if (en.isIntersecting) { drawThumb(en.target); catObs.unobserve(en.target); } }), { root: cat, rootMargin: '200px' });
+  for (const p of pieceList) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'blk'; b.dataset.p = p;
+    b.innerHTML = '<canvas width="96" height="72"></canvas><span>$' + hex(p) + '</span>'; b.title = 'Add block $' + hex(p);
+    b.onclick = () => addPiece(p); cat.appendChild(b); catObs.observe(b);
+  }
+}
+const thumbB = () => (thumbB.rom === rom ? thumbB.b : (thumbB.rom = rom, thumbB.b = new SR.Builder(rom)));
+function drawThumb(btn) {
+  const p = +btn.dataset.p, TB = thumbB(); TB.palSlots = [];
+  const one = new Array(96 * 64).fill(null); TB.placePiece({ p, m: false, x: 0x70, y: 0x70, z: 0 }, one, 0);
+  const buf = new Uint8ClampedArray(768 * 512 * 4); TB.draw([one], [0], buf, null);
+  let x0 = 768, y0 = 512, x1 = -1, y1 = -1;
+  for (let y = 0; y < 512; y++) for (let x = 0; x < 768; x++) if (buf[(y * 768 + x) * 4 + 3]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  if (x1 < 0) return;
+  const w = x1 - x0 + 1, h = y1 - y0 + 1, tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h;
+  const id = new ImageData(w, h); for (let y = 0; y < h; y++) id.data.set(buf.subarray(((y0 + y) * 768 + x0) * 4, ((y0 + y) * 768 + x0 + w) * 4), y * w * 4);
+  tmp.getContext('2d').putImageData(id, 0, 0);
+  const c = btn.querySelector('canvas'), g = c.getContext('2d'), s = Math.min(96 / w, 72 / h, 2);
+  g.imageSmoothingEnabled = false; g.drawImage(tmp, (96 - w * s) / 2, (72 - h * s) / 2, w * s, h * s);
+}
+function refreshCatalogue() {
+  const q = $('catq').value.trim().toLowerCase().replace('$', ''), onlyUsed = $('catUsed').getAttribute('aria-pressed') === 'true';
+  const inMap = new Set(); cur.lay.layers.forEach(l => l.forEach(pc => inMap.add(pc.p)));
+  for (const b of $('cat').children) { const p = +b.dataset.p; b.classList.toggle('used', inMap.has(p));
+    b.hidden = (q && !hex(p).toLowerCase().includes(q)) || (onlyUsed && !inMap.has(p)); }
+}
+$('catq').oninput = refreshCatalogue;
+$('catUsed').onclick = () => { const b = $('catUsed'); b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') !== 'true'); refreshCatalogue(); };
+function addPiece(p) {
+  const st = $('stage'), cx = (st.scrollLeft + st.clientWidth / 2) / zoom, cy = (st.scrollTop + st.clientHeight / 2) / zoom;
+  const s = (768 - cy) / 2, d = (cx - 384) / 4;
+  const x = clampv((s - d) / 2, 0, 255), y = clampv((s + d) / 2, 0, 255);
+  change(() => { cur.lay.layers[0].push({ p, m: false, x, y, z: 0 }); sel = { li: 0, k: cur.lay.layers[0].length - 1 }; });
+  refreshCatalogue(); status('Added block $' + hex(p) + ' to the back layer. Drag it into place.', 'ok');
+}
+
+// ------------------------------------------------------------ projects
+function projectJson() {
+  const layouts = {}; for (const [n, lay] of edits) { layouts[n] = lay.fgrid ? { layers: lay.layers, floor: lay.fgrid } : { layers: lay.layers }; if (lay.tset !== original.get(n).tset) layouts[n].tset = lay.tset; }
+  const mapdata = {}; for (const [p, v] of mdEdits) mapdata[v.loc] = v.md;
+  return { tool: 'Shadowrun Map Editor', version: 2, base_crc32: fmtCrc(romCrc), base_name: romName, layouts, mapdata };
+}
+function applyProject(j, fromAutosave) {
+  let count = 0;
+  for (const [ns, v] of Object.entries(j.layouts || {})) {
+    const n = +ns; if (!(n >= 0 && n < 165) || !v.layers || v.layers.length !== 2) continue;
+    if (!original.has(n)) original.set(n, SR.readLayout(rom, n));
+    const lay = clone(original.get(n)); lay.layers = v.layers.map(l => l.map(pc => ({ p: pc.p & 0x1FFF, m: !!pc.m, x: clampv(pc.x, -256, 255), y: clampv(pc.y, -256, 255), z: clampv(pc.z, -128, 127) })));
+    if (Number.isInteger(v.tset) && v.tset >= 0 && v.tset < 6) lay.tset = v.tset;
+    if (Array.isArray(v.floor) && v.floor.length === 768) lay.fgrid = v.floor.map(x => clampv(x, 0, 255));
+    edits.set(n, lay); count++;
+  }
+  for (const [ls, md] of Object.entries(j.mapdata || {})) {
+    const loc = +ls; if (!locName[loc]) continue;
+    const p = rom.w(0x8D92AF + 9 * loc); if (!mdOriginal.has(p)) mdOriginal.set(p, readMd(loc));
+    const o = mdOriginal.get(p);
+    if (!md || !Array.isArray(md.objects) || !Array.isArray(md.walls) || !Array.isArray(md.zones) || !Array.isArray(md.exits)) continue;
+    const num = (b, n) => b.slice(0, n).map(v => clampv(v, -32768, 65535));
+    mdEdits.set(p, { loc, md: { ...o, objects: md.objects.slice(0, 32).map(x => { const r = { x: clampv(x.x, 0, 2047), y: clampv(x.y, 0, 2047), z: clampv(x.z, 0, 1023), type: clampv(x.type, 0, 0x7FF8) };
+        if (x.own === true || (Number.isInteger(x.own) && x.own >= 0 && x.own < SR.CP_MAX_BIG)) r.own = x.own;
+        if (Number.isInteger(x.script) && x.script >= 0 && x.script < 0x600) r.script = x.script;
+        if (x.newItem === true) r.newItem = true; if (Number.isInteger(x.itemOf) && x.itemOf >= 0 && x.itemOf < SR.TT_FIRST) r.itemOf = x.itemOf; return r; }),
+      walls: md.walls.map(b => num(b, 6)), zones: md.zones.map(b => num(b, 7)), exits: md.exits.map(b => num(b, 7)),
+      camBox: md.camBox === null ? null : Array.isArray(md.camBox) && md.camBox.length === 4 ? md.camBox.map(v => clampv(v, 0, 4000)) : o.camBox,
+      music: Number.isInteger(md.music) && md.music >= 0 && md.music <= 255 ? md.music : o.music,
+      points: Array.isArray(md.points) && md.points.every(e => Array.isArray(e) && e.length === 3) ? md.points.map(e => num(e, 3)) : o.points,
+      los: Array.isArray(md.los) && md.los.every(e => Array.isArray(e) && e.length === 6) ? md.los.map(e => num(e, 6)) : o.los } }); count++;
+  }
+  fillMapSelect(); if (cur) openMap(cur.loc);
+  $('saveproj').disabled = !(edits.size || mdEdits.size);
+  const other = j.base_crc32 && j.base_crc32 !== fmtCrc(romCrc);
+  status((fromAutosave ? 'Picked up your unsaved edits from last time: ' : 'Loaded edits: ') + count + ' change set' + (count === 1 ? '' : 's') + '.' + (other ? ' They were made on a different ROM; check the maps before exporting.' : ''), other ? 'err' : 'ok');
+}
+async function loadProject(file) { try { applyProject(JSON.parse(await file.text()), false); } catch (e) { status('Could not read that edits file: ' + e.message, 'err'); } }
+$('projfile').onchange = e => { if (e.target.files[0]) loadProject(e.target.files[0]); e.target.value = ''; };
+
+// ------------------------------------------------------------ saving files
+async function offer(filename, data) {
+  const dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
+  if (dl) {
+    try { await dl.save({ filename, data }); return true; }
+    catch (e) { if (e && e.code === 'declined') { status('Save cancelled.'); return false; } if (!['unavailable', 'not_granted', 'capability_disabled', 'capability_removed'].includes(e && e.code)) { status('Could not save: ' + (e && e.message || e), 'err'); return false; } }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data])); a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  return true;
+}
+function zip(files) {
+  const enc = new TextEncoder(), parts = [], central = []; let off = 0;
+  for (const f of files) {
+    const name = enc.encode(f.name), data = typeof f.data === 'string' ? enc.encode(f.data) : f.data, crc = SR.crc32(data);
+    const h = new DataView(new ArrayBuffer(30)); h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(12, 0x5521, true);
+    h.setUint32(14, crc, true); h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, name.length, true);
+    parts.push(new Uint8Array(h.buffer), name, data);
+    const c = new DataView(new ArrayBuffer(46)); c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(14, 0x5521, true);
+    c.setUint32(16, crc, true); c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, name.length, true); c.setUint32(42, off, true);
+    central.push(new Uint8Array(c.buffer), name); off += 30 + name.length + data.length;
+  }
+  const csize = central.reduce((s, p) => s + p.length, 0), e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, csize, true); e.setUint32(16, off, true);
+  return new Blob([...parts, ...central, new Uint8Array(e.buffer)]);
+}
+$('saveproj').onclick = () => offer('shadowrun_map_edits.json', JSON.stringify(projectJson(), null, 1));
+$('export').onclick = async () => {
+  if (!(edits.size || mdEdits.size)) return;
+  status('Building the patch…');
+  await new Promise(r => setTimeout(r, 30));
+  let res;
+  const mdByLoc = new Map([...mdEdits.values()].map(v => [v.loc, v.md]));
+  try { res = SR.applyEdits(romU8, edits, mdByLoc); } catch (e) { status('Could not build the patch: ' + e.message, 'err'); return; }
+  const ips = SR.ipsDiff(romU8, res.rom), crcOut = fmtCrc(SR.crc32(res.rom));
+  const lines = res.report.map(r => r.items != null ? r.items + ' separate item cop' + (r.items === 1 ? 'y' : 'ies') + ' with types of their own (type table moved to bank $A3; records in RAM $7E21E0, saved at $2400 / $2500 of the 16 KB save file)' : r.scripts != null ? r.scripts + ' placed character' + (r.scripts === 1 ? ' runs' : 's run') + ' a script of their own (table in bank $A9; hook at $80A3A8)' : r.copies != null ? r.copies + ' cop' + (r.copies === 1 ? 'y has its' : 'ies have their') + ' own save slot (code and table in bank $AB; hooks at $80A343, $80A38E, $809878, $81B141, $81B15B; saved in the 4 spare bytes at the end of each save slot' + (r.big ? '; copy numbers past 24 use a bigger 16 KB save file (ROM header byte $FFD8 = 4), flags at $2000 / $2200' : '') + ')' : r.map != null ? 'map $' + hex(r.map) + ': exits, walls and characters ' + (r.where === 'map data in place' ? 'rewritten in place' : 'moved to $' + hex(r.addr, 6) + ' (loader hook at $80A3DA)')
+    : 'layout $' + hex(r.n, 2) + ' (map ' + (layoutUse[r.n] || []).map(m => '$' + hex(m.loc)).join(', ') + '): ' + r.raw + ' bytes -> ' + r.size + ' compressed, ' + (r.where === 'in place' ? 'written in place' : 'moved to $' + hex(r.addr, 6)));
+  const readme = ['Shadowrun Map Editor patch', '',
+    'Apply Shadowrun_MapEdits.ips to the ROM you edited:', '  ' + romName + '  (' + (romU8.length >> 20) + ' MB, CRC32 ' + fmtCrc(romCrc) + ')',
+    'Result: ' + (res.rom.length >> 20) + ' MB, CRC32 ' + crcOut, '', ...lines, '',
+    'Patch order: apply this LAST, on top of the exact ROM above. If you rebuild the base ROM (new Runner Pack, other patches),',
+    'load it in the editor, use "Load edits" with shadowrun_map_edits.json, and export again.',
+    'Copies with their own save slot: apply this after the Runner Pack (the save hooks chain onto whatever the ROM had). Saves made before keep working; those copies start alive. With more than 24 copies the save file becomes 16 KB: BizHawk and RetroArch/Batocera grow an older 8 KB .srm by themselves; keep a backup of it anyway.',
+    'Layouts that grew go to banks $B0-$B3 and maps with added or deleted boxes or characters to banks $B8-$BB of a 2 MB ROM (a 1 MB ROM is expanded with zeros, like the Runner Pack does).'].join('\n');
+  const files = [{ name: 'Shadowrun_MapEdits.ips', data: ips }, { name: 'shadowrun_map_edits.json', data: JSON.stringify(projectJson(), null, 1) }, { name: 'README.txt', data: readme }];
+  const ok = await offer('Shadowrun_MapEdits.zip', zip(files));
+  if (ok) status('Patch ready: ' + res.report.length + ' change set' + (res.report.length === 1 ? '' : 's') + ', IPS ' + ips.length + ' bytes. Patched ROM CRC32 ' + crcOut + '.', 'ok');
+};
+})();
+</script>

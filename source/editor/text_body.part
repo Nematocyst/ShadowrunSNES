@@ -1,0 +1,361 @@
+
+.tmain { display: grid; grid-template-columns: minmax(280px, 400px) minmax(0, 1fr); gap: 12px; flex: 1 1 auto; min-height: 0; }
+@media (max-width: 860px) { .tmain { grid-template-columns: minmax(0, 1fr); } }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chips button { padding: 4px 9px; font-size: 12px; border-radius: 999px; }
+.chips button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.tlist { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; max-height: calc(100vh - 250px); min-height: 300px; }
+.tlist button { text-align: left; display: flex; flex-direction: column; gap: 2px; padding: 6px 9px; background: transparent; border-color: transparent; white-space: normal; }
+.tlist button:hover { background: var(--panel-2); }
+.tlist button[aria-pressed="true"] { background: var(--panel-2); border-color: var(--accent); color: var(--fg); }
+.tlist .t { font-size: 13px; color: var(--fg); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.tlist .w { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tlist .ed { color: var(--accent); font-weight: 600; }
+textarea { width: 100%; box-sizing: border-box; min-height: 110px; resize: vertical; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; font: 15px/1.5 var(--mono); }
+textarea:focus-visible { outline: 2px solid var(--cyan); outline-offset: 1px; }
+.uses { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 2px; max-height: 120px; overflow-y: auto; }
+.glyphs { display: flex; flex-wrap: wrap; gap: 4px; }
+.glyphs button { padding: 3px 5px; display: flex; flex-direction: column; align-items: center; gap: 1px; font: 10px var(--mono); color: var(--muted); }
+.glyphs canvas { width: 24px; height: 24px; image-rendering: pixelated; }
+.preview { background: #0b0f3a; border: 3px double #9aa4ff; border-radius: 4px; padding: 6px; display: inline-block; max-width: 100%; overflow-x: auto; }
+.preview canvas { display: block; image-rendering: pixelated; }
+.counts { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; }
+.counts b { font-family: var(--mono); font-weight: 500; }
+.bad { color: var(--red); } .ok { color: var(--green); } .warnc { color: var(--yellow); }
+</style>
+
+<div class="wrap">
+<header>
+  <h1>Shadowrun <span>Text Editor</span></h1>
+  <span class="muted" id="romname">No ROM loaded</span>
+  <span class="grow"></span>
+  <label class="btn" for="romfile">Open ROM…</label>
+  <input type="file" id="romfile" accept=".sfc,.smc,.bin" class="visually-hidden">
+  <label class="btn" for="projfile" id="projlabel" hidden>Load edits…</label>
+  <input type="file" id="projfile" accept=".json" class="visually-hidden">
+  <button id="saveproj" disabled>Save edits</button>
+  <button id="export" class="primary" disabled>Export patch</button>
+</header>
+
+<section id="welcome" class="drop" aria-label="Open a ROM">
+  <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+    <h2>Rewrite any line in the game</h2>
+    <p>Every piece of text in Shadowrun is stored compressed: 1,589 texts covering conversations, messages, keywords and names. This editor decodes them from your ROM, lets you rewrite them with a live preview in the game's own font, and writes an IPS patch. Longer texts are moved to free space automatically.</p>
+    <ol>
+      <li>Open your Shadowrun (USA) ROM. Vanilla, Runner Pack and Expanded Dialogue ROMs all work. It stays in your browser.</li>
+      <li>Find a line by searching for its words, the person who says it, or a keyword.</li>
+      <li>Export: you get a .zip with the .ips patch for that ROM.</li>
+    </ol>
+  </div>
+  <figure style="margin:0;display:flex;flex-direction:column;gap:6px;min-width:0">
+    <img alt="A conversation box in the game showing edited text" src="data:image/png;base64,/*PREVIEW*/">
+    <figcaption class="muted" style="font-size:12px">An edited conversation line, shown by the game itself.</figcaption>
+  </figure>
+</section>
+
+<div id="app" hidden style="display:flex;flex-direction:column;gap:12px;flex:1 1 auto;min-height:0">
+  <div class="tmain">
+    <div class="card" style="min-height:0">
+      <input type="search" id="q" placeholder="Search words, a person, a keyword…" aria-label="Search texts">
+      <div class="chips" role="group" aria-label="Filter">
+        <button data-g="all" aria-pressed="true">All</button><button data-g="conv" aria-pressed="false">Conversations</button><button data-g="msg" aria-pressed="false">Messages</button><button data-g="menu" aria-pressed="false">Menus</button><button data-g="kw" aria-pressed="false">Keywords</button><button data-g="name" aria-pressed="false">Names</button><button data-g="other" aria-pressed="false">Unused?</button><button data-g="edited" aria-pressed="false">Edited</button>
+      </div>
+      <div class="muted" id="count" style="font-size:12px"></div>
+      <div class="tlist" id="list"></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+      <div class="card">
+        <div class="row"><h2 class="grow" id="ttitle">Text</h2><span class="badge mono" id="tid"></span></div>
+        <div class="uses" id="uses"></div>
+        <label for="ta" class="visually-hidden">Text</label>
+        <textarea id="ta" spellcheck="true"></textarea>
+        <div class="counts" id="counts"></div>
+        <div class="row"><button id="revert" disabled>Revert to original</button><span class="muted" style="font-size:12px">Put <kbd>|</kbd> before a word to emphasise it, as the game does for keywords. Line breaks are automatic.</span></div>
+        <div id="warn" class="msg err" hidden></div>
+      </div>
+      <div class="card">
+        <div class="row"><h2 class="grow">Preview</h2><select id="pvwin" hidden aria-label="Window to preview"></select></div>
+        <div class="muted" id="pvnote" style="font-size:12px"></div>
+        <div><div class="preview"><canvas id="pv" width="142" height="88"></canvas></div></div>
+      </div>
+      <div class="card">
+        <h2>Special characters</h2>
+        <div class="muted" style="font-size:12px">The game's font has a few extra symbols, plus blanks of 1 to 8 pixels (␣) that menus use to line things up. Click one to insert it; in the text it shows as a code like {08}. Characters the font lacks (# % &amp; + ; &lt; &gt; @ [ ] ^ ` ~ and accents) can't be used.</div>
+        <div class="glyphs" id="glyphs"></div>
+      </div>
+    </div>
+  </div>
+  <div id="status" class="msg" aria-live="polite">Ready.</div>
+</div>
+</div>
+
+<script>/*SRTEXT*/</script>
+<script type="application/json" id="meta">/*META*/</script>
+<script>
+(() => {
+'use strict';
+const META = JSON.parse(document.getElementById('meta').textContent);
+const $ = id => document.getElementById(id);
+const hex = (n, w = 4) => n.toString(16).toUpperCase().padStart(w, '0');
+const fmtCrc = c => c.toString(16).toUpperCase().padStart(8, '0');
+const crc32 = u8 => { let c, crc = 0xFFFFFFFF; const T = crc32.T || (crc32.T = Array.from({ length: 256 }, (_, n) => { c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; })); for (let i = 0; i < u8.length; i++) crc = T[(crc ^ u8[i]) & 0xFF] ^ (crc >>> 8); return (crc ^ 0xFFFFFFFF) >>> 0; };
+const GROUP = { conv: 'Conversation', msg: 'Message', menu: 'Menu text', kw: 'Keyword', name: 'Name', other: 'Not referenced' };
+const SPECIAL = [0x01, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x0E, 0x0F, 0x10, 0x11, 0x1E, 0x1F, 0x7F];
+const CONV_W = 142, CONV_LINES = 11, MENU_W = 104;
+let romU8 = null, T = null, inv = [], byId = new Map(), romName = '', romCrc = 0, cur = null, group = 'all';
+const edits = new Map();   // id -> codes
+
+function status(text, kind) { const s = $('status'); s.textContent = text; s.className = 'msg' + (kind ? ' ' + kind : ''); }
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+
+async function loadRom(file) {
+  let u8 = new Uint8Array(await file.arrayBuffer());
+  if (u8.length % 0x8000 === 512) u8 = u8.slice(512);
+  const title = String.fromCharCode(...u8.slice(0x7FC0, 0x7FC9));
+  if (title !== 'SHADOWRUN' || u8.length < 0x100000) { status('That file is not a Shadowrun (USA) ROM (title "' + title.trim() + '"). Open the .sfc or .smc file of the US release.', 'err'); return; }
+  romU8 = u8; romName = file.name; romCrc = crc32(u8); T = new ST.Texts(u8); edits.clear();
+  inv = T.inventory(META); byId = new Map(inv.map(e => [e.id, e]));
+  $('romname').textContent = file.name + ' · ' + (u8.length >> 20) + ' MB · CRC ' + fmtCrc(romCrc) + (T.ed ? ' · Expanded Dialogue' : '') + (T.hooked ? ' · ' + T.redirects.size + ' moved texts' : '');
+  $('welcome').hidden = true; $('app').hidden = false; $('projlabel').hidden = false;
+  buildGlyphs();
+  const saved = store.get('sr-text-edits-' + romCrc);
+  if (saved) { try { applyProject(JSON.parse(saved), true); } catch (e) {} }
+  else status(inv.length + ' texts loaded. Search or pick one from the list.', 'ok');
+  fillList(); select(inv.find(e => e.g === 'conv') || inv[0]);
+}
+$('romfile').onchange = e => { if (e.target.files[0]) loadRom(e.target.files[0]); e.target.value = ''; };
+const welcome = $('welcome');
+['dragenter', 'dragover'].forEach(t => document.addEventListener(t, e => { e.preventDefault(); welcome.classList.add('hot'); }));
+['dragleave', 'drop'].forEach(t => document.addEventListener(t, e => { e.preventDefault(); welcome.classList.remove('hot'); }));
+document.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (!f) return; if (/\.json$/i.test(f.name) && romU8) loadProject(f); else loadRom(f); });
+
+const codesOf = e => edits.has(e.id) ? edits.get(e.id) : e.codes;
+const plain = codes => ST.fromCodes(codes).replace(/\|/g, '');
+
+// ------------------------------------------------------------ list
+function fillList() {
+  const q = $('q').value.trim().toLowerCase(), list = $('list'); list.textContent = ''; let n = 0;
+  const frag = document.createDocumentFragment();
+  for (const e of inv) {
+    if (group === 'edited' ? !edits.has(e.id) : (group !== 'all' && e.g !== group)) continue;
+    const s = plain(codesOf(e));
+    if (q && !s.toLowerCase().includes(q) && !e.l.some(x => x.toLowerCase().includes(q)) && hex(e.id).toLowerCase() !== q.replace('$', '')) continue;
+    const b = document.createElement('button'); b.type = 'button'; b.dataset.id = e.id;
+    b.innerHTML = '<span class="t"></span><span class="w"></span>';
+    b.firstChild.textContent = (edits.has(e.id) ? '● ' : '') + (s || '(empty)'); if (edits.has(e.id)) b.firstChild.classList.add('ed');
+    b.lastChild.textContent = GROUP[e.g] + ' · ' + e.l[0] + (e.l.length > 1 ? ' (+' + (e.l.length - 1) + ')' : '');
+    b.setAttribute('aria-pressed', cur === e); b.onclick = () => select(e);
+    frag.appendChild(b); if (++n >= 600) break;
+  }
+  list.appendChild(frag);
+  $('count').textContent = n >= 600 ? 'First 600 matches; narrow the search to see more.' : n + ' text' + (n === 1 ? '' : 's');
+}
+$('q').oninput = fillList;
+document.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { group = b.dataset.g; document.querySelectorAll('[data-g]').forEach(x => x.setAttribute('aria-pressed', x === b)); fillList(); });
+
+// ------------------------------------------------------------ editor
+function select(e) {
+  if (!e) return; cur = e;
+  for (const b of $('list').children) b.setAttribute('aria-pressed', +b.dataset.id === e.id);
+  $('ttitle').textContent = GROUP[e.g]; $('tid').textContent = 'text $' + hex(e.id);
+  const u = $('uses'); u.textContent = '';
+  const head = document.createElement('div'); head.textContent = e.l.length > 1 ? 'Shown in ' + e.l.length + ' places. Changing it changes all of them:' : 'Shown in:'; u.appendChild(head);
+  e.l.slice(0, 40).forEach(x => { const d = document.createElement('div'); d.textContent = '· ' + x; u.appendChild(d); });
+  if (e.l.length > 40) { const d = document.createElement('div'); d.textContent = '· and ' + (e.l.length - 40) + ' more'; u.appendChild(d); }
+  $('ta').value = ST.fromCodes(codesOf(e));
+  fillWins(); refresh();
+}
+// windows a text is shown in (measured in the emulator; see build_msg_windows.js)
+function windowsOf(e) {
+  const out = [], seen = new Set();
+  const put = w => { const k = w.W + '/' + w.lines + '/' + (w.menu ? 1 : 0) + '/' + (w.indent || 0); if (seen.has(k)) return; seen.add(k); out.push(w); };
+  if (e.g === 'conv') put({ label: 'Conversation box', W: CONV_W, lines: CONV_LINES });
+  for (const i of e.msg || []) for (const [k, w, h, sid] of (META.msg_win || {})[i] || []) {
+    if (k === 'f') put({ label: 'Floating message ' + w + '×' + h + ' tiles (script $' + hex(sid, 3) + ')', W: (w - 2) * 8, lines: Math.max(1, h - 2) });
+    else if (k === 'c') put({ label: 'Conversation box (script $' + hex(sid, 3) + ')', W: CONV_W, lines: CONV_LINES });
+    else if (k === 'm') put({ label: 'Choice in a list menu (script $' + hex(sid, 3) + ')', W: MENU_W, lines: 1, menu: true });
+  }
+  if (e.g !== 'conv') for (const [w, h, col, row] of (META.eng_win || {})[hex(e.id)] || []) put({ label: 'Game window ' + w + '×' + h + ' tiles' + (col || row ? ', starting at column ' + col + ', line ' + (row + 1) : ''), W: (w - 2) * 8, lines: Math.max(1, h - 2 - row), indent: col * 8 });
+  out.sort((a, b) => a.W - b.W || a.lines - b.lines);
+  return out;
+}
+let wins = [], win = null;
+function fillWins() {
+  wins = windowsOf(cur); win = wins[0] || null; const s = $('pvwin'); s.textContent = ''; s.hidden = wins.length < 2;
+  wins.forEach((w, i) => { const o = document.createElement('option'); o.value = i; o.textContent = w.label; s.appendChild(o); });
+}
+$('pvwin').onchange = () => { win = wins[+$('pvwin').value]; refresh(); };
+const textWidth = codes => { let x = 0, b = false; for (const c of codes) { if (c === 124) { b = true; continue; } if (c === 32) b = false; x += width(c) + (b ? 1 : 0); } return x; };
+function check(codes) {
+  const bad = [...new Set(codes.filter(c => !T.canEncode(c)))];
+  return bad;
+}
+function refresh() {
+  if (!cur) return;
+  const codes = ST.toCodes($('ta').value), bad = check(codes);
+  const counts = $('counts'); counts.innerHTML = '';
+  const add = (label, val, cls) => { const s = document.createElement('span'); s.innerHTML = label + ' <b></b>'; s.lastChild.textContent = val; if (cls) s.lastChild.className = cls; counts.appendChild(s); };
+  add('Characters', codes.length + ' / ' + ST.MAXLEN, codes.length > ST.MAXLEN ? 'bad' : codes.length > 218 ? 'warnc' : '');
+  let enc = null; if (!bad.length && codes.length) { try { enc = T.encode(codes); } catch (x) {} }
+  if (enc) add('Stored size', enc.length + ' bytes (was ' + cur.bytes + ')', enc.length > cur.bytes ? 'warnc' : 'ok');
+  const lines = win ? (win.menu ? [codes] : wrap(codes, win.W, win.indent || 0)) : [];
+  const tooWide = win && win.menu && textWidth(codes) >= MENU_W, tooMany = win && !win.menu && lines.length > win.lines;
+  if (win && win.menu) add('Width in the menu', textWidth(codes) + ' / ' + (MENU_W - 1) + ' px', tooWide ? 'bad' : '');
+  else if (win) add('Lines in the window', lines.length + ' / ' + win.lines, tooMany ? 'bad' : lines.length === win.lines ? 'warnc' : '');
+  const w = $('warn'); const msgs = [];
+  if (bad.length) msgs.push('The game font has no ' + bad.map(c => c >= 32 && c < 127 ? '"' + String.fromCharCode(c) + '"' : '{' + c.toString(16).toUpperCase() + '}').join(', ') + '. Replace ' + (bad.length > 1 ? 'them' : 'it') + ' to save this text.');
+  if (codes.length > ST.MAXLEN) msgs.push('Texts are limited to ' + ST.MAXLEN + ' characters: longer ones would overwrite game memory.');
+  if (!codes.length) msgs.push('A text cannot be empty. Use a single space if you want it blank.');
+  if (tooMany) msgs.push('This will not fit in the ' + (win.lines === CONV_LINES && win.W === CONV_W ? 'conversation box' : 'window') + ' (' + lines.length + ' lines, room for ' + win.lines + ').' + (wins.length > 1 ? ' It is shown in more than one window; the preview uses the smallest.' : '') + (/^Floating/.test(win.label) ? ' Floating messages get their size from the script that shows them: widen or heighten the window there in the Script Editor: FLOATER(time, message, style, height, width, y, x), sizes in 8-pixel tiles including the border.' : ''));
+  if (tooWide) msgs.push('Menu entries must fit on one line, under ' + MENU_W + ' pixels; a longer one breaks the menu.');
+  if (enc && enc.length > cur.bytes) msgs.push('Longer than the original, so it will be moved to free space at export (this works, it just adds a small patch hook).');
+  w.hidden = !msgs.length; w.textContent = msgs.join(' '); w.className = 'msg ' + (bad.length || codes.length > ST.MAXLEN || !codes.length || tooMany || tooWide ? 'err' : '');
+  const valid = !bad.length && codes.length && codes.length <= ST.MAXLEN;
+  const same = codes.join() === cur.codes.join();
+  if (valid) { if (same) edits.delete(cur.id); else edits.set(cur.id, codes); }
+  $('revert').disabled = !edits.has(cur.id);
+  drawPreview(codes, lines);
+  const item = [...$('list').children].find(b => +b.dataset.id === cur.id);
+  if (item) { item.firstChild.textContent = (edits.has(cur.id) ? '● ' : '') + (plain(codes) || '(empty)'); item.firstChild.classList.toggle('ed', edits.has(cur.id)); }
+  $('export').disabled = !edits.size; $('saveproj').disabled = !edits.size;
+  autosave();
+}
+let refreshT = 0;
+$('ta').oninput = () => { clearTimeout(refreshT); refreshT = setTimeout(refresh, 60); };
+$('revert').onclick = () => { if (!cur) return; edits.delete(cur.id); $('ta').value = ST.fromCodes(cur.codes); refresh(); status('Back to the original text.'); };
+
+// ------------------------------------------------------------ font + preview (renderer $80FB03: wrap by pixel width)
+const width = c => ST.glyph(romU8, c).w;
+function wrap(codes, W, indent) {
+  const lines = []; let line = [], rem = W - (indent || 0), bold = false, i = 0;
+  while (i < codes.length) {
+    let j = i, w = 0, b = bold;
+    while (j < codes.length && codes[j] !== 32) { if (codes[j] === 124) { b = true; j++; continue; } w += width(codes[j]) + (b ? 1 : 0); j++; }
+    if (w === 0) w = 5;
+    if (w >= rem && (line.length || lines.length === 0 && indent)) { lines.push(line); line = []; rem = W; }
+    for (let k = i; k < j; k++) { if (codes[k] === 124) { bold = true; line.push(124); continue; } line.push(codes[k]); rem -= width(codes[k]) + (bold ? 1 : 0); }
+    i = j;
+    if (i < codes.length && codes[i] === 32) { bold = false; if (line.length) { line.push(32); rem -= width(32); } i++; }
+  }
+  if (line.length) lines.push(line);
+  return lines;
+}
+function drawGlyph(id, W, x, y, c, bold, color) {
+  // glyph rows are right-aligned: bit (w-1) is the leftmost pixel; bold = row | row << 1, one pixel wider
+  const g = ST.glyph(romU8, c), w = g.w + (bold ? 1 : 0);
+  for (let r = 0; r < 8; r++) {
+    let row = g.rows[r]; if (bold) row = row | (row << 1);
+    for (let k = 0; k < w; k++) if (row & (1 << (w - 1 - k))) { const px = x + k, py = y + r; if (px < 0 || px >= W || py < 0) continue; const o = (py * W + px) * 4; if (o + 3 >= id.data.length) continue; id.data[o] = color[0]; id.data[o + 1] = color[1]; id.data[o + 2] = color[2]; id.data[o + 3] = 255; }
+  }
+}
+function drawPreview(codes, lines) {
+  const known = !!win, W = known ? (win.menu ? Math.max(MENU_W, textWidth(codes) + 1) : win.W) : 236, maxL = known ? win.lines : 0;
+  const shown = known ? lines : wrap(codes, W), H = Math.max(known ? maxL : 1, shown.length) * 8;
+  const cv = $('pv'); cv.width = W; cv.height = H; const scale = 2; cv.style.width = W * scale + 'px'; cv.style.height = H * scale + 'px';
+  const g = cv.getContext('2d'), id = g.createImageData(W, H);
+  shown.forEach((ln, r) => {
+    let x = r === 0 && win ? (win.indent || 0) : 0, bold = false;
+    const over = known && r >= maxL;
+    for (const c of ln) {
+      if (c === 124) { bold = true; continue; }
+      if (c === 32) bold = false;
+      const red = over || (win && win.menu && x + width(c) > MENU_W - 1);
+      drawGlyph(id, W, x, r * 8, c, bold, red ? [255, 107, 94] : [248, 248, 248]); x += width(c) + (bold ? 1 : 0);
+    }
+  });
+  g.putImageData(id, 0, 0);
+  $('pvnote').textContent = !known ? 'The window for this text is drawn by the game engine (menus, status screens) and has not been measured: the preview uses a wide box.'
+    : win.menu ? 'One entry of a list menu: ' + (MENU_W - 1) + ' px at most. Anything past that is red.'
+    : win.label.replace(/ \(script.*$/, '') + ': ' + win.W + ' px wide' + (win.indent ? ' (this text starts ' + win.indent + ' px in)' : '') + ', ' + win.lines + ' line' + (win.lines === 1 ? '' : 's') + ' from where it starts. Lines that will not fit are red.';
+}
+function buildGlyphs() {
+  const box = $('glyphs'); box.textContent = '';
+  for (const c of SPECIAL) {
+    if (!T.canEncode(c)) continue;
+    const b = document.createElement('button'); b.type = 'button'; b.title = 'Insert {' + c.toString(16).toUpperCase().padStart(2, '0') + '}';
+    const gl = ST.glyph(romU8, c), blank = gl.rows.every(r => !r);
+    if (blank) { b.title += ': a blank ' + gl.w + ' px wide, used to line up menus'; b.innerHTML = '<span style="font-size:13px;color:var(--fg);height:24px;display:flex;align-items:center">␣' + gl.w + '</span><span>' + c.toString(16).toUpperCase().padStart(2, '0') + '</span>'; }
+    else { b.innerHTML = '<canvas width="8" height="8"></canvas><span>' + c.toString(16).toUpperCase().padStart(2, '0') + '</span>';
+      const g = b.firstChild.getContext('2d'), id = g.createImageData(8, 8); drawGlyph(id, 8, 0, 0, c, false, [248, 248, 248]); g.putImageData(id, 0, 0); }
+    b.onclick = () => { const ta = $('ta'), s = ta.selectionStart, t = '{' + c.toString(16).toUpperCase().padStart(2, '0') + '}'; ta.setRangeText(t, s, ta.selectionEnd, 'end'); ta.focus(); refresh(); };
+    box.appendChild(b);
+  }
+}
+
+// ------------------------------------------------------------ projects
+function projectJson() {
+  const texts = {}; for (const [id, codes] of edits) texts[hex(id)] = ST.fromCodes(codes);
+  return { tool: 'Shadowrun Text Editor', version: 1, base_crc32: fmtCrc(romCrc), base_name: romName, texts };
+}
+function autosave() { store.set('sr-text-edits-' + romCrc, JSON.stringify(projectJson())); }
+function applyProject(j, auto) {
+  let n = 0, skipped = 0;
+  for (const [k, s] of Object.entries(j.texts || {})) {
+    const id = parseInt(k, 16), e = byId.get(id); if (!e) { skipped++; continue; }
+    const codes = ST.toCodes(String(s)); if (check(codes).length || !codes.length || codes.length > ST.MAXLEN) { skipped++; continue; }
+    if (codes.join() !== e.codes.join()) { edits.set(id, codes); n++; }
+  }
+  fillList(); if (cur) select(cur);
+  $('export').disabled = !edits.size; $('saveproj').disabled = !edits.size;
+  const other = j.base_crc32 && j.base_crc32 !== fmtCrc(romCrc);
+  status((auto ? 'Picked up your unsaved edits from last time: ' : 'Loaded edits: ') + n + ' text' + (n === 1 ? '' : 's') + '.' + (skipped ? ' ' + skipped + ' could not be used on this ROM.' : '') + (other ? ' They were made on a different ROM; check them before exporting.' : ''), other || skipped ? 'err' : 'ok');
+}
+async function loadProject(file) { try { applyProject(JSON.parse(await file.text()), false); } catch (e) { status('Could not read that edits file: ' + e.message, 'err'); } }
+$('projfile').onchange = e => { if (e.target.files[0]) loadProject(e.target.files[0]); e.target.value = ''; };
+
+// ------------------------------------------------------------ files
+async function offer(filename, data) {
+  const dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
+  if (dl) {
+    try { await dl.save({ filename, data }); return true; }
+    catch (e) { if (e && e.code === 'declined') { status('Save cancelled.'); return false; } if (!['unavailable', 'not_granted', 'capability_disabled', 'capability_removed'].includes(e && e.code)) { status('Could not save: ' + (e && e.message || e), 'err'); return false; } }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data])); a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  return true;
+}
+function ipsDiff(oldU8, newU8) {
+  const out = [0x50, 0x41, 0x54, 0x43, 0x48], n = newU8.length, grew = n > oldU8.length, old = i => (i < oldU8.length ? oldU8[i] : 0);
+  let i = 0;
+  while (i < n) {
+    if (old(i) === newU8[i]) { i++; continue; }
+    let j = i; while (j < n && j - i < 0xFFFF && (old(j) !== newU8[j] || (j + 1 < n && old(j + 1) !== newU8[j + 1]))) j++;
+    let s = i; if (s === 0x454F46) s--;
+    out.push(s >> 16, (s >> 8) & 0xFF, s & 0xFF, ((j - s) >> 8) & 0xFF, (j - s) & 0xFF); for (let k = s; k < j; k++) out.push(newU8[k]); i = j;
+  }
+  if (grew) { const s = n - 1; out.push(s >> 16, (s >> 8) & 0xFF, s & 0xFF, 0, 1, newU8[n - 1]); }
+  out.push(0x45, 0x4F, 0x46); return Uint8Array.from(out);
+}
+function zip(files) {
+  const enc = new TextEncoder(), parts = [], central = []; let off = 0;
+  for (const f of files) {
+    const name = enc.encode(f.name), data = typeof f.data === 'string' ? enc.encode(f.data) : f.data, crc = crc32(data);
+    const h = new DataView(new ArrayBuffer(30)); h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(12, 0x5521, true);
+    h.setUint32(14, crc, true); h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, name.length, true);
+    parts.push(new Uint8Array(h.buffer), name, data);
+    const c = new DataView(new ArrayBuffer(46)); c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(14, 0x5521, true);
+    c.setUint32(16, crc, true); c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, name.length, true); c.setUint32(42, off, true);
+    central.push(new Uint8Array(c.buffer), name); off += 30 + name.length + data.length;
+  }
+  const csize = central.reduce((s, p) => s + p.length, 0), e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, csize, true); e.setUint32(16, off, true);
+  return new Blob([...parts, ...central, new Uint8Array(e.buffer)]);
+}
+$('saveproj').onclick = () => offer('shadowrun_text_edits.json', JSON.stringify(projectJson(), null, 1));
+$('export').onclick = async () => {
+  if (!edits.size) return;
+  status('Building the patch…'); await new Promise(r => setTimeout(r, 30));
+  let res; try { res = ST.applyTextEdits(romU8, inv, edits); } catch (e) { status('Could not build the patch: ' + e.message, 'err'); return; }
+  const ips = ipsDiff(romU8, res.rom), crcOut = fmtCrc(crc32(res.rom));
+  const moved = res.report.filter(r => r.where === 'moved').length;
+  const readme = ['Shadowrun Text Editor patch', '',
+    'Apply Shadowrun_TextEdits.ips to the ROM you edited:', '  ' + romName + '  (' + (romU8.length >> 20) + ' MB, CRC32 ' + fmtCrc(romCrc) + ')',
+    'Result: ' + (res.rom.length >> 20) + ' MB, CRC32 ' + crcOut, '',
+    edits.size + ' texts changed: ' + (edits.size - moved) + ' written in place, ' + moved + ' moved to free space (banks $B4-$B7, hook at $80FE44).', '',
+    ...res.report.map(r => 'text $' + hex(r.id) + ': ' + r.size + ' bytes, ' + (r.where === 'in place' ? 'in place' : 'moved to $' + hex(r.addr, 6))), '',
+    'The map editor patch uses different parts of the ROM, so both patches can be applied, in either order, to the same base ROM.',
+    'If you rebuild the base ROM, load it here, use "Load edits" with shadowrun_text_edits.json, and export again.'].join('\n');
+  const ok = await offer('Shadowrun_TextEdits.zip', zip([{ name: 'Shadowrun_TextEdits.ips', data: ips }, { name: 'shadowrun_text_edits.json', data: JSON.stringify(projectJson(), null, 1) }, { name: 'README.txt', data: readme }]));
+  if (ok) status('Patch ready: ' + edits.size + ' texts, IPS ' + ips.length + ' bytes. Patched ROM CRC32 ' + crcOut + '.', 'ok');
+};
+})();
+</script>

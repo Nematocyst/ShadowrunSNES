@@ -1,0 +1,337 @@
+
+.cmain { display: grid; grid-template-columns: minmax(250px, 320px) minmax(0, 1fr) minmax(240px, 300px); gap: 12px; flex: 1 1 auto; min-height: 0; }
+@media (max-width: 1150px) { .cmain { grid-template-columns: minmax(240px, 300px) minmax(0, 1fr); } .cref { grid-column: 1 / -1; } }
+@media (max-width: 760px) { .cmain { grid-template-columns: minmax(0, 1fr); } }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chips button { padding: 4px 9px; font-size: 12px; border-radius: 999px; }
+.chips button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.clist { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; max-height: calc(100vh - 250px); min-height: 300px; }
+.clist button { text-align: left; display: flex; flex-direction: column; gap: 1px; padding: 5px 8px; background: transparent; border-color: transparent; white-space: normal; }
+.clist button:hover { background: var(--panel-2); }
+.clist button[aria-pressed="true"] { background: var(--panel-2); border-color: var(--accent); color: var(--fg); }
+.clist .t { font-size: 13px; } .clist .w { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.clist .ed { color: var(--accent); font-weight: 600; } .clist .pk { color: var(--yellow); }
+.code { display: grid; grid-template-columns: auto minmax(0, 1fr); border: 1px solid var(--line); border-radius: 6px; background: var(--bg); overflow: hidden; }
+.code pre { margin: 0; padding: 8px 6px; font: 13px/1.5 var(--mono); color: var(--muted); text-align: right; user-select: none; background: var(--panel); border-right: 1px solid var(--line); overflow: hidden; }
+.code textarea { border: 0; border-radius: 0; min-height: 420px; height: calc(100vh - 360px); font: 13px/1.5 var(--mono); padding: 8px 10px; white-space: pre; overflow: auto; resize: vertical; tab-size: 4; background: var(--bg); color: var(--fg); width: 100%; box-sizing: border-box; }
+.code textarea:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px; }
+.cstat { font-size: 13px; padding: 8px 10px; border-radius: 6px; background: var(--panel-2); border-left: 3px solid var(--green); font-family: var(--mono); }
+.cstat.err { border-left-color: var(--red); color: var(--fg); } .cstat.warn { border-left-color: var(--yellow); }
+.ref { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 6px; }
+.ref code, .ref kbd { font: 12px var(--mono); color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+.ref pre { margin: 0; font: 12px/1.45 var(--mono); color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px; overflow-x: auto; }
+.cmds { max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; }
+.cmds button { text-align: left; padding: 3px 6px; background: transparent; border-color: transparent; font: 12px var(--mono); display: flex; justify-content: space-between; gap: 8px; }
+.cmds button:hover { background: var(--panel-2); }
+.cmds button span { color: var(--muted); }
+.uses { font-size: 12px; color: var(--muted); }
+</style>
+
+<div class="wrap">
+<header>
+  <h1>Shadowrun <span>Script Editor</span></h1>
+  <span class="muted" id="romname">No ROM loaded</span>
+  <span class="grow"></span>
+  <label class="btn" for="romfile">Open ROM…</label>
+  <input type="file" id="romfile" accept=".sfc,.smc,.bin" class="visually-hidden">
+  <label class="btn" for="projfile" id="projlabel" hidden>Load edits…</label>
+  <input type="file" id="projfile" accept=".json" class="visually-hidden">
+  <button id="saveproj" disabled>Save edits</button>
+  <button id="export" class="primary" disabled>Export patch</button>
+</header>
+
+<section id="welcome" class="drop" aria-label="Open a ROM">
+  <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+    <h2>Change what happens in the game</h2>
+    <p>Everything that happens in Shadowrun, from a door opening to a boss fight, is one of 936 small scripts. This editor turns each script into readable code, lets you change it, adds brand-new scripts, compiles it all back and writes an IPS patch. Decompiling and recompiling every original script gives the same game, frame for frame.</p>
+    <ol>
+      <li>Open your Shadowrun (USA) ROM. Vanilla and Runner Pack ROMs both work. It stays in your browser.</li>
+      <li>Find a script by name, by who uses it (Hitman, Glutman's door…) or by its number from the Script Atlas.</li>
+      <li>Edit the code. It recompiles as you type and points at the line if something is wrong.</li>
+      <li>Need something the game doesn't have? "+ New script" makes one (numbered from $400) that any other script can run.</li>
+      <li>Export: you get a .zip with the .ips patch for that ROM.</li>
+    </ol>
+  </div>
+  <div style="min-width:0">
+    <div class="ref"><pre>script $060 args 1 returns no
+    self = arg1
+    ADD_NUYEN(1234)        ; new line: +1,234 nuyen
+    SET_VAR(0, 42)
+    REMOVE_SELF(self)
+    end</pre>
+    <span>The script that runs when you enter Jake's street, with one added line. In the game, Jake's money goes up by exactly 1,234.</span></div>
+  </div>
+</section>
+
+<div id="app" hidden style="display:flex;flex-direction:column;gap:12px;flex:1 1 auto;min-height:0">
+  <div class="cmain">
+    <div class="card" style="min-height:0">
+      <input type="search" id="q" placeholder="Search: Hitman, door, $060, WARP…" aria-label="Search scripts">
+      <div class="chips" role="group" aria-label="Filter"><button data-f="all" aria-pressed="true">All</button><button data-f="named" aria-pressed="false">Named</button><button data-f="edited" aria-pressed="false">Edited</button><button data-f="new" aria-pressed="false">New</button></div>
+      <button id="newscr" type="button">+ New script</button>
+      <label class="row muted small" style="font-size:12px;gap:6px"><input type="checkbox" id="incode"> also search inside the code</label>
+      <div class="muted" id="count" style="font-size:12px"></div>
+      <div class="clist" id="list"></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+      <div class="card">
+        <div class="row"><h2 class="grow" id="ctitle">Script</h2><span class="badge mono" id="cid"></span></div>
+        <div class="uses" id="uses"></div>
+        <div id="packwarn" class="msg err" hidden></div>
+        <div class="code"><pre id="gutter" aria-hidden="true">1</pre><textarea id="src" spellcheck="false" aria-label="Script code" wrap="off"></textarea></div>
+        <div id="cstat" class="cstat" aria-live="polite">Ready.</div>
+        <div class="row"><button id="revert" disabled>Revert to original</button><button id="delscr" hidden>Delete this new script</button><span class="muted" style="font-size:12px">Comments after <kbd>;</kbd> are notes only. Edits are kept in this browser until you export.</span></div>
+      </div>
+    </div>
+    <div class="card cref">
+      <h2>How the code reads</h2>
+      <div class="ref">
+        <span><code>self</code> the object running the script; <code>L.w1</code> <code>L.b5</code> its local word and byte slots (<code>L.sb5</code> reads a byte as signed); <code>var[42]</code> the game's story variables; <code>gb[$xxxx]</code> <code>gw[$xxxx]</code> any byte or word in RAM bank $7E.</span>
+        <span>Numbers: <code>200</code>, <code>-3</code>, <code>$02BD</code> (hex). Maths and tests: <code>+ - * / % &lt;&lt; &gt;&gt; &amp; | ^ ~</code>, <code>== != &lt; &lt;= &gt; &gt;=</code> (true is -1, false 0), <code>bool(x)</code>, <code>inc(x)</code>, <code>dec(x)</code>, <code>neg(x)</code>.</span>
+        <pre>if GET_PROGRESS() == 3 {
+    TEXT_BOX(12)
+} else {
+    WAIT(30, 1)
+}
+while L.w1 &lt; 5 {
+    L.w1 = L.w1 + 1
+}
+goto L_0040        ; jump to a label
+L_0040:            ; a label</pre>
+        <span>A script starts with its arguments waiting: take them first (<code>self = arg1</code>). <code>end</code> finishes it, <code>end x</code> also gives back a value. <code>script_22F(self)</code> runs another script. <code>push</code>, <code>pop()</code>, <code>dup(...)</code>, <code>drop</code> and <code>gosub</code> appear where the original code juggles values in ways plain code can't show; leave them as they are.</span>
+      </div>
+      <h2>Commands</h2>
+      <input type="search" id="cq" placeholder="Find a command: WARP, TEXT…" aria-label="Find a command">
+      <div class="cmds" id="cmds"></div>
+      <div class="muted" style="font-size:12px">Click a command to insert it. The number is how many values it takes; → means it gives one back. The <b>last</b> value is usually the object it acts on.</div>
+    </div>
+  </div>
+  <div id="status" class="msg" aria-live="polite">Ready.</div>
+</div>
+</div>
+
+<script>/*SRTEXT*/</script>
+<script>/*SRVM*/</script>
+<script type="application/json" id="smeta">/*SMETA*/</script>
+<script>
+(() => {
+'use strict';
+const META = JSON.parse(document.getElementById('smeta').textContent);
+const $ = id => document.getElementById(id);
+const hex = (n, w = 3) => n.toString(16).toUpperCase().padStart(w, '0');
+const fmtCrc = c => c.toString(16).toUpperCase().padStart(8, '0');
+const crc32 = u8 => { let c, crc = 0xFFFFFFFF; const T = crc32.T || (crc32.T = Array.from({ length: 256 }, (_, n) => { c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; })); for (let i = 0; i < u8.length; i++) crc = T[(crc ^ u8[i]) & 0xFF] ^ (crc >>> 8); return (crc ^ 0xFFFFFFFF) >>> 0; };
+let romU8 = null, vm = null, T = null, romName = '', romCrc = 0, cur = null, filter = 'all', pack = false;
+const original = new Map();   // id -> decompiled text (with notes)
+const edits = new Map();      // id -> edited text
+const builds = new Map();     // id -> build result for edited scripts
+function status(text, kind) { const s = $('status'); s.textContent = text; s.className = 'msg' + (kind ? ' ' + kind : ''); }
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+const meta = id => id >= SV.NEW_BASE ? ['New script', [], 0] : (META.meta[id] || ['', [], 0]);
+const isNew = id => id >= SV.NEW_BASE;
+const NEW_TEMPLATE = id => 'script $' + hex(id) + ' args 1 returns no\n    self = arg1\n    ; your code here\n    end\n';
+// args/returns of every new script as written now, so that other scripts can call it before it is in the ROM
+function headSig(t) { const m = /^\s*script\s+\$?[0-9A-Fa-f]+\s+args\s+(\d+)\s+returns\s+(yes|no)/m.exec(t || ''); return m ? [+m[1], m[2] === 'yes'] : null; }
+function syncPending() { vm.pending.clear(); vm.gone.clear(); for (const [id, t] of edits) if (isNew(id) && t == null) vm.gone.add(id); for (const [id, t] of edits) if (isNew(id) && t != null) { const h = headSig(t); if (h) vm.pending.set(id, h); } }
+function newIds() { const s = new Set(vm.newDir.keys()); for (const [id, t] of edits) if (isNew(id)) { if (t == null) s.delete(id); else s.add(id); } return [...s].sort((a, b) => a - b); }
+function rebuildAll() { syncPending(); for (const [id, t] of edits) { if (t == null) { builds.set(id, null); continue; } try { builds.set(id, SV.build(vm, t, id)); } catch (e) { builds.delete(id); } } }
+
+async function loadRom(file) {
+  let u8 = new Uint8Array(await file.arrayBuffer());
+  if (u8.length % 0x8000 === 512) u8 = u8.slice(512);
+  const title = String.fromCharCode(...u8.slice(0x7FC0, 0x7FC9));
+  if (title !== 'SHADOWRUN' || u8.length < 0x100000) { status('That file is not a Shadowrun (USA) ROM (title "' + title.trim() + '"). Open the .sfc or .smc file of the US release.', 'err'); return; }
+  romU8 = u8; romName = file.name; romCrc = crc32(u8); vm = new SV.VM(u8); T = new ST.Texts(u8);
+  pack = u8.length >= 0x200000 && u8.slice(SV.L(0xBF8000), SV.L(0xBF8000) + 64).some(x => x);
+  original.clear(); edits.clear(); builds.clear();
+  $('romname').textContent = file.name + ' · ' + (u8.length >> 20) + ' MB · CRC ' + fmtCrc(romCrc) + (pack ? ' · Runner Pack' : '');
+  $('welcome').hidden = true; $('app').hidden = false; $('projlabel').hidden = false;
+  fillCmds();
+  const saved = store.get('sr-script-edits-' + romCrc);
+  if (saved) { try { applyProject(JSON.parse(saved), true); } catch (e) {} } else status('Pick a script on the left. Its code appears in the middle.', 'ok');
+  fillList(); select(0x060);
+}
+$('romfile').onchange = e => { if (e.target.files[0]) loadRom(e.target.files[0]); e.target.value = ''; };
+const welcome = $('welcome');
+['dragenter', 'dragover'].forEach(t => document.addEventListener(t, e => { e.preventDefault(); welcome.classList.add('hot'); }));
+['dragleave', 'drop'].forEach(t => document.addEventListener(t, e => { e.preventDefault(); welcome.classList.remove('hot'); }));
+document.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (!f) return; if (/\.json$/i.test(f.name) && romU8) loadProject(f); else loadRom(f); });
+
+// ------------------------------------------------------------ decompile with notes
+function msgText(i) { try { const id = vm.w(0x80D980 + 2 * i); const d = T.decode(id); return d ? ST.fromCodes(d.codes).replace(/\|/g, '') : null; } catch (e) { return null; } }
+const num = s => { if (s == null) return null; if (/^\$[0-9A-Fa-f]+$/.test(s)) return parseInt(s.slice(1), 16); if (/^[+-]?\d+$/.test(s)) return parseInt(s, 10); return null; };
+function annotate(kind, id, args) {
+  if (kind === 'script') { const m = meta(id); return m[0] ? m[0] : null; }
+  const q = s => { const t = msgText(num(s)); return t != null ? '"' + (t.length > 70 ? t.slice(0, 70) + '…' : t) + '"' : null; };
+  if (id === 0x99 || id === 0xD6) return q(args[args.length - 1]);
+  if (id === 0xB4) return q(args[0]);
+  if (id === 0xC7) return q(args[1]);
+  if ((id === 0x56 || id === 0x54) && num(args[0]) != null) return 'to location $' + hex(num(args[0]));
+  return null;
+}
+function orig(id) { if (!original.has(id)) original.set(id, isNew(id) && !vm.inRom(id) ? NEW_TEMPLATE(id) : vm.decompile(id, annotate)); return original.get(id); }
+const textOf = id => edits.has(id) && edits.get(id) != null ? edits.get(id) : orig(id);
+
+// ------------------------------------------------------------ list
+let codeIndex = null;
+function buildCodeIndex() { codeIndex = []; for (let id = 0; id < SV.NSCR; id++) codeIndex.push(orig(id).toLowerCase()); }
+function fillList() {
+  const q = $('q').value.trim().toLowerCase(), list = $('list'), inCode = $('incode').checked; list.textContent = ''; let n = 0;
+  if (inCode && q && !codeIndex) { status('Indexing the code of all 936 scripts…'); buildCodeIndex(); status('Searching inside the code too.'); }
+  const ids = []; for (let id = 0; id < SV.NSCR; id++) ids.push(id); ids.push(...newIds());
+  for (const id of ids) {
+    const m = meta(id), name = m[0] || (m[1][0] || '');
+    if (filter === 'new' && !isNew(id)) continue;
+    if (filter === 'named' && !name) continue;
+    if (filter === 'edited' && !edits.has(id)) continue;
+    if (q) { const hay = (name + ' ' + m[1].join(' ') + ' $' + hex(id).toLowerCase() + ' ' + hex(id).toLowerCase()).toLowerCase();
+      if (!hay.includes(q.replace(/^\$/, '$')) && !(inCode && (isNew(id) ? textOf(id).toLowerCase() : codeIndex[id]).includes(q))) continue; }
+    const b = document.createElement('button'); b.type = 'button'; b.dataset.id = id;
+    b.innerHTML = '<span class="t"></span><span class="w"></span>';
+    b.firstChild.textContent = (edits.has(id) ? '● ' : '') + '$' + hex(id) + (name ? ' · ' + name : '');
+    if (edits.has(id)) b.firstChild.classList.add('ed'); else if (pack && META.pack[id]) b.firstChild.classList.add('pk');
+    b.lastChild.textContent = isNew(id) ? (vm.inRom(id) ? 'added by an earlier patch' : 'not in the ROM yet') : m[2] ? 'used by ' + (m[1].slice(0, 3).join(', ') || m[2] + ' thing' + (m[2] > 1 ? 's' : '')) : 'nothing known uses it';
+    b.setAttribute('aria-pressed', cur === id); b.onclick = () => select(id); list.appendChild(b); n++;
+  }
+  $('count').textContent = n + ' script' + (n === 1 ? '' : 's');
+}
+$('q').oninput = fillList; $('incode').onchange = fillList;
+document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { filter = b.dataset.f; document.querySelectorAll('[data-f]').forEach(x => x.setAttribute('aria-pressed', x === b)); fillList(); });
+
+// ------------------------------------------------------------ editor
+function select(id) {
+  cur = id; for (const b of $('list').children) b.setAttribute('aria-pressed', +b.dataset.id === id);
+  const m = meta(id); $('ctitle').textContent = m[0] || 'Script $' + hex(id); $('cid').textContent = 'script $' + hex(id);
+  $('delscr').hidden = !isNew(id); $('delscr').disabled = !(isNew(id) && id === Math.max(...newIds()));
+  $('delscr').title = $('delscr').disabled ? 'Only the highest-numbered new script can be deleted (the numbers must stay without gaps). Empty this one instead.' : '';
+  $('uses').textContent = isNew(id) ? 'A brand-new script. Other scripts run it with script_' + hex(id) + '(...), passing as many values as its args.' : m[2] ? 'Used by: ' + (m[1].join(', ') || '') + (m[2] > m[1].length ? (m[1].length ? ' and ' : '') + (m[2] - m[1].length) + ' more (see the Script Atlas)' : '') : 'Nothing known uses this script (it may be started by the engine, or be a leftover).';
+  const pw = $('packwarn'); pw.hidden = !(pack && META.pack[id]);
+  pw.textContent = 'The Runner Pack recognises this script by its address: ' + (META.pack[id] || '') + '. Editing it can switch that feature off. Small edits that keep the code the same length are safest.';
+  $('src').value = textOf(id); gutter(); compileNow();
+}
+function gutter() { const n = $('src').value.split('\n').length; let s = ''; for (let i = 1; i <= n; i++) s += i + '\n'; $('gutter').textContent = s; $('gutter').scrollTop = $('src').scrollTop; }
+$('src').addEventListener('scroll', () => { $('gutter').scrollTop = $('src').scrollTop; });
+let tmr = 0;
+$('src').addEventListener('input', () => { gutter(); clearTimeout(tmr); tmr = setTimeout(compileNow, 250); });
+$('src').addEventListener('keydown', e => { if (e.key === 'Tab') { e.preventDefault(); const t = e.target, s = t.selectionStart; t.setRangeText('    ', s, t.selectionEnd, 'end'); t.dispatchEvent(new Event('input')); } });
+function compileNow() {
+  if (cur == null) return;
+  const txt = $('src').value, st = $('cstat'), same = txt === orig(cur);
+  try {
+    if (isNew(cur)) { const h = headSig(txt); if (h) vm.pending.set(cur, h); }
+    const b = SV.build(vm, txt, cur), keep = !same || (isNew(cur) && !vm.inRom(cur));
+    let msg, kind = '';
+    if (isNew(cur) && !vm.inRom(cur)) msg = 'Compiles: ' + (2 + b.code.length) + ' bytes. New script $' + hex(cur) + ' takes ' + b.args + ' value' + (b.args === 1 ? '' : 's') + (b.ret ? ' and gives one back.' : '.');
+    else {
+      const ins = vm.decode(cur), oldLen = 2 + Math.max(...ins.map(i => i.pc + i.len)), newLen = 2 + b.code.length;
+      const oldArgs = vm.newDir.has(cur) ? vm.newDir.get(cur).args : vm.scriptArgs(cur), oldRet = vm.newDir.has(cur) ? vm.newDir.get(cur).ret : vm.scriptRet(cur);
+      msg = 'Compiles: ' + newLen + ' bytes (was ' + oldLen + ').';
+      if (b.args !== oldArgs || b.ret !== oldRet) { msg += ' The header changes what this script takes or gives back: every script that calls it must match.'; kind = 'warn'; }
+    }
+    if (keep) { edits.set(cur, txt); builds.set(cur, b); } else { edits.delete(cur); builds.delete(cur); }
+    st.textContent = same ? 'Original code. ' + msg : msg; st.className = 'cstat' + (kind ? ' ' + kind : '');
+  } catch (e) {
+    if (!same || (isNew(cur) && !vm.inRom(cur))) { edits.set(cur, txt); builds.delete(cur); }
+    st.textContent = e.message || String(e); st.className = 'cstat err';
+    if (e.line) { const lines = txt.split('\n'); let pos = 0; for (let i = 0; i < e.line - 1 && i < lines.length; i++) pos += lines[i].length + 1; }
+  }
+  $('revert').disabled = !edits.has(cur);
+  const item = [...$('list').children].find(b => +b.dataset.id === cur);
+  if (item) { const m = meta(cur), name = m[0] || (m[1][0] || ''); item.firstChild.textContent = (edits.has(cur) ? '● ' : '') + '$' + hex(cur) + (name ? ' · ' + name : ''); item.firstChild.classList.toggle('ed', edits.has(cur)); }
+  if (isNew(cur)) for (const id of edits.keys()) if (id !== cur && edits.get(id) != null) { try { builds.set(id, SV.build(vm, edits.get(id), id)); } catch (e) { builds.delete(id); } }
+  const broken = [...edits.keys()].filter(id => !builds.has(id));
+  $('export').disabled = !edits.size || broken.length > 0; $('saveproj').disabled = !edits.size;
+  if (broken.length && edits.size) status('Export is off until every edited script compiles: ' + broken.map(id => '$' + hex(id)).join(', ') + '.', 'err');
+  store.set('sr-script-edits-' + romCrc, JSON.stringify(projectJson()));
+}
+$('newscr').onclick = () => {
+  const ids = newIds(), id = ids.length ? Math.max(...ids) + 1 : SV.NEW_BASE;
+  if (id >= SV.NEW_BASE + SV.NEW_MAX) { status('That is the most new scripts this editor can add (' + SV.NEW_MAX + ').', 'err'); return; }
+  original.delete(id); edits.set(id, NEW_TEMPLATE(id)); vm.gone.delete(id); vm.pending.set(id, [1, false]); fillList(); select(id);
+  status('New script $' + hex(id) + ' added. Write its code, then run it from another script with script_' + hex(id) + '(self).', 'ok');
+};
+$('delscr').onclick = () => {
+  if (cur == null || !isNew(cur)) return; const id = cur, tag = 'script_' + hex(id).toLowerCase();
+  const callers = [...edits].filter(([k, t]) => k !== id && t != null && t.toLowerCase().includes(tag)).map(([k]) => '$' + hex(k));
+  if (vm.inRom(id)) { edits.set(id, null); builds.set(id, null); } else { edits.delete(id); builds.delete(id); }
+  vm.pending.delete(id); original.delete(id); rebuildAll(); fillList(); const rest = newIds(); select(rest.length ? rest[rest.length - 1] : 0x060);
+  status('Deleted new script $' + hex(id) + '.' + (callers.length ? ' Still called by ' + callers.join(', ') + ': fix those before exporting.' : ''), callers.length ? 'err' : 'ok');
+};
+$('revert').onclick = () => { if (cur == null) return; if (isNew(cur) && !vm.inRom(cur)) { edits.set(cur, NEW_TEMPLATE(cur)); $('src').value = NEW_TEMPLATE(cur); gutter(); compileNow(); status('Back to an empty new script.'); return; } edits.delete(cur); builds.delete(cur); $('src').value = orig(cur); gutter(); compileNow(); status('Back to the original code.'); };
+
+// ------------------------------------------------------------ command list
+function fillCmds() {
+  const q = $('cq').value.trim().toLowerCase(), box = $('cmds'); box.textContent = '';
+  const all = Object.entries(SV.NATIVES).map(([k, v]) => [v.replace('?', ''), +k]).sort((a, b) => a[0].localeCompare(b[0]));
+  for (const [nm, id] of all) {
+    if (q && !nm.toLowerCase().includes(q)) continue;
+    const na = vm.nativeArgs(id), rt = vm.nativeRet(id), b = document.createElement('button'); b.type = 'button';
+    b.innerHTML = '<b></b><span></span>'; b.firstChild.textContent = nm; b.lastChild.textContent = na + (rt ? ' →' : '');
+    b.title = SV.NATIVES[id].includes('?') ? 'Name is a best guess from what the routine does' : nm;
+    b.onclick = () => { const ta = $('src'), s = ta.selectionStart, args = Array.from({ length: na }, (_, i) => i === na - 1 ? 'self' : '0').join(', ');
+      ta.setRangeText(nm + '(' + args + ')', s, ta.selectionEnd, 'end'); ta.focus(); ta.dispatchEvent(new Event('input')); };
+    box.appendChild(b);
+  }
+}
+$('cq').oninput = fillCmds;
+
+// ------------------------------------------------------------ projects + export
+function projectJson() { const s = {}; for (const [id, t] of edits) s[hex(id)] = t; return { tool: 'Shadowrun Script Editor', version: 1, base_crc32: fmtCrc(romCrc), base_name: romName, scripts: s }; }
+function applyProject(j, auto) {
+  let n = 0, bad = 0;
+  for (const [k, t] of Object.entries(j.scripts || {})) { const id = parseInt(k, 16);
+    if (!((id >= 0 && id < SV.NSCR) || (id >= SV.NEW_BASE && id < SV.NEW_BASE + SV.NEW_MAX))) continue;
+    if (t === null && isNew(id)) { edits.set(id, null); n++; continue; } if (typeof t !== 'string') continue; edits.set(id, t); n++; }
+  rebuildAll(); bad = [...edits].filter(([id, t]) => t != null && !builds.has(id)).length;
+  const other = j.base_crc32 && j.base_crc32 !== fmtCrc(romCrc);
+  status((auto ? 'Picked up your unsaved edits from last time: ' : 'Loaded edits: ') + n + ' script' + (n === 1 ? '' : 's') + '.' + (bad ? ' ' + bad + ' do not compile yet.' : '') + (other ? ' They were made on a different ROM; check them before exporting.' : ''), other || bad ? 'err' : 'ok');
+  if (cur != null) { fillList(); select(cur); }
+}
+async function loadProject(file) { try { applyProject(JSON.parse(await file.text()), false); } catch (e) { status('Could not read that edits file: ' + e.message, 'err'); } }
+$('projfile').onchange = e => { if (e.target.files[0]) loadProject(e.target.files[0]); e.target.value = ''; };
+async function offer(filename, data) {
+  const dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
+  if (dl) {
+    try { await dl.save({ filename, data }); return true; }
+    catch (e) { if (e && e.code === 'declined') { status('Save cancelled.'); return false; } if (!['unavailable', 'not_granted', 'capability_disabled', 'capability_removed'].includes(e && e.code)) { status('Could not save: ' + (e && e.message || e), 'err'); return false; } }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data])); a.download = filename; document.body.appendChild(a); a.click(); a.remove(); return true;
+}
+function ipsDiff(oldU8, newU8) {
+  const out = [0x50, 0x41, 0x54, 0x43, 0x48], n = newU8.length, grew = n > oldU8.length, old = i => (i < oldU8.length ? oldU8[i] : 0); let i = 0;
+  while (i < n) { if (old(i) === newU8[i]) { i++; continue; } let j = i; while (j < n && j - i < 0xFFFF && (old(j) !== newU8[j] || (j + 1 < n && old(j + 1) !== newU8[j + 1]))) j++;
+    let s = i; if (s === 0x454F46) s--; out.push(s >> 16, (s >> 8) & 0xFF, s & 0xFF, ((j - s) >> 8) & 0xFF, (j - s) & 0xFF); for (let k = s; k < j; k++) out.push(newU8[k]); i = j; }
+  if (grew) { const s = n - 1; out.push(s >> 16, (s >> 8) & 0xFF, s & 0xFF, 0, 1, newU8[n - 1]); }
+  out.push(0x45, 0x4F, 0x46); return Uint8Array.from(out);
+}
+function zip(files) {
+  const enc = new TextEncoder(), parts = [], central = []; let off = 0;
+  for (const f of files) {
+    const name = enc.encode(f.name), data = typeof f.data === 'string' ? enc.encode(f.data) : f.data, crc = crc32(data);
+    const h = new DataView(new ArrayBuffer(30)); h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(12, 0x5521, true); h.setUint32(14, crc, true); h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, name.length, true);
+    parts.push(new Uint8Array(h.buffer), name, data);
+    const c = new DataView(new ArrayBuffer(46)); c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(14, 0x5521, true); c.setUint32(16, crc, true); c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, name.length, true); c.setUint32(42, off, true);
+    central.push(new Uint8Array(c.buffer), name); off += 30 + name.length + data.length;
+  }
+  const csize = central.reduce((s, p) => s + p.length, 0), e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, csize, true); e.setUint32(16, off, true);
+  return new Blob([...parts, ...central, new Uint8Array(e.buffer)]);
+}
+$('saveproj').onclick = () => offer('shadowrun_script_edits.json', JSON.stringify(projectJson(), null, 1));
+$('export').onclick = async () => {
+  status('Building the patch…'); await new Promise(r => setTimeout(r, 30));
+  let res; try { res = SV.applyScripts(romU8, builds); } catch (e) { status('Could not build the patch: ' + e.message, 'err'); return; }
+  const ips = ipsDiff(romU8, res.rom), crcOut = fmtCrc(crc32(res.rom));
+  res.report.sort((x, y) => x.id - y.id);
+  const lines = res.report.map(r => r.where === 'new' ? 'new script $' + hex(r.id) + ': ' + r.size + ' bytes at $' + hex(r.addr, 6) : r.where === 'deleted' ? 'new script $' + hex(r.id) + ': deleted' : 'script $' + hex(r.id) + (meta(r.id)[0] ? ' (' + meta(r.id)[0] + ')' : '') + ': ' + r.size + ' bytes, ' + (r.where === 'in place' ? 'in place' : 'moved to $' + hex(r.addr, 6)) + (pack && META.pack[r.id] ? '  [Runner Pack: ' + META.pack[r.id] + ']' : ''));
+  const readme = ['Shadowrun Script Editor patch', '', 'Apply Shadowrun_Scripts.ips to the ROM you edited:', '  ' + romName + '  (' + (romU8.length >> 20) + ' MB, CRC32 ' + fmtCrc(romCrc) + ')', 'Result: ' + (res.rom.length >> 20) + ' MB, CRC32 ' + crcOut, '', ...lines, '',
+    'Scripts that grew live in banks $AC-$AE; the script directory in bank $82 points at them.',
+    ...(res.report.some(r => r.where === 'new') || vm.newDir.size ? ['New scripts ($400 and up) are listed in a small directory at $AC:A400; three hooks ($80C298, $80F433, $80F473) send the game there and pass every other script number on, so the Runner Pack\'s own scripts keep working.'] : []),
+    'The source of every edited script is in shadowrun_script_edits.json: load it in the editor to keep working or to rebuild the patch on another ROM.',
+    'Map, text and colour patches use other parts of the ROM. Apply this one after the Runner Pack if you use it.'].join('\n');
+  const srcs = [...edits].map(([id, t]) => ({ name: 'scripts/script_' + hex(id) + '.srs', data: t }));
+  const ok = await offer('Shadowrun_Scripts.zip', zip([{ name: 'Shadowrun_Scripts.ips', data: ips }, { name: 'shadowrun_script_edits.json', data: JSON.stringify(projectJson(), null, 1) }, { name: 'README.txt', data: readme }, ...srcs]));
+  if (ok) status('Patch ready: ' + res.report.length + ' script' + (res.report.length === 1 ? '' : 's') + ', IPS ' + ips.length + ' bytes. Patched ROM CRC32 ' + crcOut + '.', 'ok');
+};
+})();
+</script>

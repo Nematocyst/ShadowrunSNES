@@ -1,0 +1,666 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shadowrun Text Editor</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a workbench. Map canvas fills the left, a fixed-width inspector + block catalogue on the right; stacks on phones.
+   Single dark look on purpose: map art is judged against black, like the game itself. */
+:root {
+  --bg: #0d0f14; --panel: #151922; --panel-2: #1c2130; --line: #2a3142; --fg: #e4e7ef; --muted: #8d95a8;
+  --accent: #ff4f9a; --accent-ink: #1a0610; --cyan: #3fd6e8; --green: #59e08a; --yellow: #f2c94c; --red: #ff6b5e;
+  --display: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--fg); font: 14px/1.45 var(--body); }
+.wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 14px 24px; display: flex; flex-direction: column; gap: 12px; min-height: 100%; box-sizing: border-box; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+h1 { font: 600 22px/1 var(--display); letter-spacing: .02em; margin: 0; }
+h1 span { color: var(--accent); }
+h2 { font: 600 13px/1.2 var(--display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.grow { flex: 1 1 auto; }
+button, .btn, select, input { font: inherit; color: var(--fg); }
+button, .btn { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 6px 11px; cursor: pointer; white-space: nowrap; }
+button:hover:not(:disabled), .btn:hover { border-color: var(--muted); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+button:focus-visible, input:focus-visible, select:focus-visible, .btn:focus-within { outline: 2px solid var(--cyan); outline-offset: 2px; }
+input[type="number"], input[type="search"], select { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; min-width: 0; }
+input[type="number"] { width: 5.5em; font-family: var(--mono); }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.toolbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 4px; }
+main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 12px; flex: 1 1 auto; min-height: 0; }
+@media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); } }
+.stage { background: #000; border: 1px solid var(--line); border-radius: 8px; overflow: auto; position: relative; min-height: 320px; max-height: calc(100vh - 170px); }
+.stage canvas { display: block; image-rendering: pixelated; }
+#over { position: absolute; left: 0; top: 0; }
+aside { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.field { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
+.meters { display: grid; grid-template-columns: auto 1fr auto; gap: 6px 10px; align-items: center; font-size: 12px; }
+.bar { height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--cyan); }
+.bar.warn i { background: var(--yellow); } .bar.over i { background: var(--red); }
+.cat { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; max-height: 420px; overflow-y: auto; padding-right: 2px; }
+.blk { background: #000; border: 1px solid var(--line); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; gap: 2px; align-items: stretch; cursor: pointer; text-align: left; }
+.blk canvas { width: 100%; aspect-ratio: 4 / 3; image-rendering: pixelated; }
+.blk span { font: 11px var(--mono); color: var(--muted); }
+.blk.used span { color: var(--accent); }
+.drop { border: 2px dashed var(--line); border-radius: 10px; padding: 20px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 24px; align-items: center; }
+@media (max-width: 760px) { .drop { grid-template-columns: minmax(0, 1fr); } }
+.drop.hot { border-color: var(--accent); }
+.drop img { width: 100%; border-radius: 6px; border: 1px solid var(--line); image-rendering: pixelated; }
+.drop ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; max-width: 60ch; }
+.drop p { margin: 0; max-width: 62ch; }
+.badge { font: 500 11px var(--mono); padding: 2px 6px; border-radius: 4px; background: var(--panel-2); border: 1px solid var(--line); }
+.badge.edit { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.msg { font-size: 13px; padding: 8px 10px; border-radius: 6px; background: var(--panel-2); border-left: 3px solid var(--cyan); }
+.msg.err { border-left-color: var(--red); } .msg.ok { border-left-color: var(--green); }
+.keys { font-size: 12px; color: var(--muted); display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; }
+kbd { font: 11px var(--mono); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; color: var(--fg); }
+#mapsel { max-width: 340px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+@media (prefers-reduced-motion: no-preference) { .bar i { transition: width .2s; } }
+
+.modes { display: flex; gap: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.modes button { border: 0; border-radius: 0; border-right: 1px solid var(--line); padding: 7px 14px; font-family: var(--display); font-weight: 600; letter-spacing: .03em; }
+.modes button:last-child { border-right: 0; }
+.modes button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.pal { display: grid; grid-template-columns: repeat(auto-fill, minmax(66px, 1fr)); gap: 4px; max-height: 360px; overflow-y: auto; }
+.pal button { padding: 3px; background: #000; display: flex; flex-direction: column; align-items: center; gap: 2px; font: 10px var(--mono); color: var(--muted); }
+.pal button canvas { width: 64px; height: 32px; image-rendering: pixelated; }
+.pal button[aria-pressed="true"] { outline: 2px solid var(--accent); background: #000; color: var(--accent); }
+.list { display: flex; flex-direction: column; gap: 2px; max-height: 300px; overflow-y: auto; }
+.list button { text-align: left; display: flex; gap: 8px; align-items: baseline; padding: 4px 8px; background: transparent; border-color: transparent; }
+.list button[aria-pressed="true"] { background: var(--panel-2); color: var(--fg); border-color: var(--accent); }
+.list button .mono { color: var(--muted); font-size: 12px; }
+.list button.off { opacity: .5; text-decoration: line-through; }
+.grid6 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.grid6 input { width: 100%; box-sizing: border-box; }
+select.wide { width: 100%; }
+
+.tmain { display: grid; grid-template-columns: minmax(280px, 400px) minmax(0, 1fr); gap: 12px; flex: 1 1 auto; min-height: 0; }
+@media (max-width: 860px) { .tmain { grid-template-columns: minmax(0, 1fr); } }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chips button { padding: 4px 9px; font-size: 12px; border-radius: 999px; }
+.chips button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.tlist { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; max-height: calc(100vh - 250px); min-height: 300px; }
+.tlist button { text-align: left; display: flex; flex-direction: column; gap: 2px; padding: 6px 9px; background: transparent; border-color: transparent; white-space: normal; }
+.tlist button:hover { background: var(--panel-2); }
+.tlist button[aria-pressed="true"] { background: var(--panel-2); border-color: var(--accent); color: var(--fg); }
+.tlist .t { font-size: 13px; color: var(--fg); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.tlist .w { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tlist .ed { color: var(--accent); font-weight: 600; }
+textarea { width: 100%; box-sizing: border-box; min-height: 110px; resize: vertical; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; font: 15px/1.5 var(--mono); }
+textarea:focus-visible { outline: 2px solid var(--cyan); outline-offset: 1px; }
+.uses { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 2px; max-height: 120px; overflow-y: auto; }
+.glyphs { display: flex; flex-wrap: wrap; gap: 4px; }
+.glyphs button { padding: 3px 5px; display: flex; flex-direction: column; align-items: center; gap: 1px; font: 10px var(--mono); color: var(--muted); }
+.glyphs canvas { width: 24px; height: 24px; image-rendering: pixelated; }
+.preview { background: #0b0f3a; border: 3px double #9aa4ff; border-radius: 4px; padding: 6px; display: inline-block; max-width: 100%; overflow-x: auto; }
+.preview canvas { display: block; image-rendering: pixelated; }
+.counts { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; }
+.counts b { font-family: var(--mono); font-weight: 500; }
+.bad { color: var(--red); } .ok { color: var(--green); } .warnc { color: var(--yellow); }
+</style>
+
+<div class="wrap">
+<header>
+  <h1>Shadowrun <span>Text Editor</span></h1>
+  <span class="muted" id="romname">No ROM loaded</span>
+  <span class="grow"></span>
+  <label class="btn" for="romfile">Open ROM…</label>
+  <input type="file" id="romfile" accept=".sfc,.smc,.bin" class="visually-hidden">
+  <label class="btn" for="projfile" id="projlabel" hidden>Load edits…</label>
+  <input type="file" id="projfile" accept=".json" class="visually-hidden">
+  <button id="saveproj" disabled>Save edits</button>
+  <button id="export" class="primary" disabled>Export patch</button>
+</header>
+
+<section id="welcome" class="drop" aria-label="Open a ROM">
+  <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+    <h2>Rewrite any line in the game</h2>
+    <p>Every piece of text in Shadowrun is stored compressed: 1,589 texts covering conversations, messages, keywords and names. This editor decodes them from your ROM, lets you rewrite them with a live preview in the game's own font, and writes an IPS patch. Longer texts are moved to free space automatically.</p>
+    <ol>
+      <li>Open your Shadowrun (USA) ROM. Vanilla, Runner Pack and Expanded Dialogue ROMs all work. It stays in your browser.</li>
+      <li>Find a line by searching for its words, the person who says it, or a keyword.</li>
+      <li>Export: you get a .zip with the .ips patch for that ROM.</li>
+    </ol>
+  </div>
+  <figure style="margin:0;display:flex;flex-direction:column;gap:6px;min-width:0">
+    <img alt="A conversation box in the game showing edited text" src="data:image/png;base64,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">
+    <figcaption class="muted" style="font-size:12px">An edited conversation line, shown by the game itself.</figcaption>
+  </figure>
+</section>
+
+<div id="app" hidden style="display:flex;flex-direction:column;gap:12px;flex:1 1 auto;min-height:0">
+  <div class="tmain">
+    <div class="card" style="min-height:0">
+      <input type="search" id="q" placeholder="Search words, a person, a keyword…" aria-label="Search texts">
+      <div class="chips" role="group" aria-label="Filter">
+        <button data-g="all" aria-pressed="true">All</button><button data-g="conv" aria-pressed="false">Conversations</button><button data-g="msg" aria-pressed="false">Messages</button><button data-g="menu" aria-pressed="false">Menus</button><button data-g="kw" aria-pressed="false">Keywords</button><button data-g="name" aria-pressed="false">Names</button><button data-g="other" aria-pressed="false">Unused?</button><button data-g="edited" aria-pressed="false">Edited</button>
+      </div>
+      <div class="muted" id="count" style="font-size:12px"></div>
+      <div class="tlist" id="list"></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+      <div class="card">
+        <div class="row"><h2 class="grow" id="ttitle">Text</h2><span class="badge mono" id="tid"></span></div>
+        <div class="uses" id="uses"></div>
+        <label for="ta" class="visually-hidden">Text</label>
+        <textarea id="ta" spellcheck="true"></textarea>
+        <div class="counts" id="counts"></div>
+        <div class="row"><button id="revert" disabled>Revert to original</button><span class="muted" style="font-size:12px">Put <kbd>|</kbd> before a word to emphasise it, as the game does for keywords. Line breaks are automatic.</span></div>
+        <div id="warn" class="msg err" hidden></div>
+      </div>
+      <div class="card">
+        <div class="row"><h2 class="grow">Preview</h2><select id="pvwin" hidden aria-label="Window to preview"></select></div>
+        <div class="muted" id="pvnote" style="font-size:12px"></div>
+        <div><div class="preview"><canvas id="pv" width="142" height="88"></canvas></div></div>
+      </div>
+      <div class="card">
+        <h2>Special characters</h2>
+        <div class="muted" style="font-size:12px">The game's font has a few extra symbols, plus blanks of 1 to 8 pixels (␣) that menus use to line things up. Click one to insert it; in the text it shows as a code like {08}. Characters the font lacks (# % &amp; + ; &lt; &gt; @ [ ] ^ ` ~ and accents) can't be used.</div>
+        <div class="glyphs" id="glyphs"></div>
+      </div>
+    </div>
+  </div>
+  <div id="status" class="msg" aria-live="polite">Ready.</div>
+</div>
+</div>
+
+<script>// Shadowrun (SNES) text core: Huffman decode/encode with the game's own tree, text inventory, font preview,
+// and writing edited texts back (in place when they fit, otherwise into a pool with a redirect hook).
+// Format: text id < $C000 -> bytes at $9D:(id|$8000) (bank $9E when id bit 15 is set); bit stream MSB first.
+// Tree at $9D:8000: node = two words (bit 0 / bit 1); word bit 15 set = leaf with 1-2 chars (high byte first,
+// $00 = none); $0A ends the text. Decoder $80FE33/$80FE44 -> buffer $7E21A0 -> renderer $80FB03 (wraps by pixel
+// width, font $95:F2D0 8 bytes/char, widths $81:ABC8, '|' = emphasised word until the next space).
+// Expanded Dialogue: ids >= $C000 -> 3-byte pointers at $A0:8100 + 3*(id-$C000) (hook JML $A08000 at $80FE33).
+// Our hook: JML $B48000 at $80FE44 (the shared entry): looks the 24-bit pointer up in a table at $B4:8100
+// (word: end offset = 6*count, then [old ptr 3][new ptr 3] entries) and swaps it. Relocated texts live at $B5:8000+.
+(function (root) {
+'use strict';
+const L = a => ((a & 0x7F0000) >> 1) | (a & 0x7FFF);
+const MAXLEN = 250;           // decoded characters; vanilla max is 218, the buffer at $7E21A0 must not reach $7E2300
+const HOOK = 0xB48000, TABLE = 0xB48100, POOL_FIRST = 0xB5, POOL_LAST = 0xB7;
+
+function rb(u8, a) { return u8[L(a)]; }
+function rw(u8, a) { return u8[L(a)] | (u8[L(a + 1)] << 8); }
+
+class Texts {
+  constructor(u8) {
+    this.u8 = u8; this.leaves = []; this.codes = new Map();   // key "c1,c2" -> bit string
+    const walk = (x, code) => {
+      for (const b of [0, 1]) {
+        const w = rw(u8, 0x9D8000 + x + 2 * b);
+        if (w & 0x8000) { const c1 = (w >> 8) & 0x7F, c2 = w & 0x7F; this.leaves.push([c1, c2, code + b]); this.codes.set(c1 + ',' + c2, code + b); }
+        else walk(w, code + b);
+      }
+    };
+    walk(0, '');
+    this.single = new Set(this.leaves.filter(l => l[1] === 0).map(l => l[0]));
+    this.ed = rb(u8, 0x80FE33) === 0x5C && rw(u8, 0x80FE34) === 0x8000 && rb(u8, 0x80FE36) === 0xA0;
+    this.hooked = rb(u8, 0x80FE44) === 0x5C && rw(u8, 0x80FE45) === (HOOK & 0xFFFF) && rb(u8, 0x80FE47) === (HOOK >> 16);
+    this.redirects = new Map();   // original ptr -> pool ptr
+    if (this.hooked && u8.length >= 0x200000) {
+      const end = rw(u8, TABLE);
+      for (let o = 0; o < end && o < 0x7E00; o += 6) {
+        const a = rw(u8, TABLE + 2 + o) | (rb(u8, TABLE + 4 + o) << 16), b = rw(u8, TABLE + 5 + o) | (rb(u8, TABLE + 7 + o) << 16);
+        this.redirects.set(a, b);
+      }
+    }
+  }
+  basePtr(id) {
+    if (id >= 0xC000) { if (!this.ed) return null; const t = 0xA08100 + 3 * (id - 0xC000); return rw(this.u8, t) | (rb(this.u8, t + 2) << 16); }
+    return ((0x9D + (id & 0x8000 ? 1 : 0)) << 16) | (id | 0x8000);
+  }
+  ptr(id) { const b = this.basePtr(id); return b == null ? null : (this.redirects.get(b) || b); }
+  // decode at a 24-bit pointer -> {codes: [char codes], bytes: length in bytes}
+  decodeAt(p) {
+    const u8 = this.u8, out = []; let bit = 0;
+    const base = L(p);
+    for (let guard = 0; guard < 4000; guard++) {
+      let x = 0, w;
+      for (;;) {
+        if ((u8[base + (bit >> 3)] >> (7 - (bit & 7))) & 1) x += 2;
+        bit++; w = u8[0xE8000 + x] | (u8[0xE8001 + x] << 8);
+        if (w & 0x8000) break; x = w;
+        if (x > 0x2000) return null;
+      }
+      const c1 = (w >> 8) & 0x7F, c2 = w & 0x7F;
+      if (c1 === 0x0A) return { codes: out, bytes: (bit + 7) >> 3 };
+      out.push(c1);
+      if (c2) { if (c2 === 0x0A) return { codes: out, bytes: (bit + 7) >> 3 }; out.push(c2); }
+    }
+    return null;
+  }
+  decode(id) { const p = this.ptr(id); return p == null ? null : this.decodeAt(p); }
+  // optimal encoding with the fixed tree (1- and 2-char leaves), ending with a leaf that holds $0A
+  encode(codes) {
+    const n = codes.length, INF = 1e9, best = new Array(n + 1).fill(INF), from = new Array(n + 1);
+    best[0] = 0;
+    for (let i = 0; i < n; i++) {
+      if (best[i] >= INF) continue;
+      const one = this.codes.get(codes[i] + ',0');
+      if (one && best[i] + one.length < best[i + 1]) { best[i + 1] = best[i] + one.length; from[i + 1] = [i, one]; }
+      if (i + 1 < n) { const two = this.codes.get(codes[i] + ',' + codes[i + 1]); if (two && best[i] + two.length < best[i + 2]) { best[i + 2] = best[i] + two.length; from[i + 2] = [i, two]; } }
+    }
+    // terminator: (0A,0) after everything, or (c,0A) covering the last char
+    let endBits = null, endBest = INF;
+    const t1 = this.codes.get('10,0');
+    if (t1 && best[n] < INF) { endBest = best[n] + t1.length; endBits = { at: n, code: t1 }; }
+    if (n > 0 && best[n - 1] < INF) { const t2 = this.codes.get(codes[n - 1] + ',10'); if (t2 && best[n - 1] + t2.length < endBest) { endBest = best[n - 1] + t2.length; endBits = { at: n - 1, code: t2 }; } }
+    if (!endBits) throw new Error('cannot encode');
+    const parts = [endBits.code]; let i = endBits.at;
+    while (i > 0) { if (!from[i]) throw new Error('character not in the game font: ' + codes[i - 1]); parts.push(from[i][1]); i = from[i][0]; }
+    const bits = parts.reverse().join('');
+    const out = new Uint8Array((bits.length + 7) >> 3);
+    for (let k = 0; k < bits.length; k++) if (bits[k] === '1') out[k >> 3] |= 0x80 >> (k & 7);
+    return out;
+  }
+  canEncode(code) { return this.single.has(code); }
+  // ---- inventory: every text the game points at, with where it is used
+  inventory(meta) {
+    const u8 = this.u8, list = new Map();
+    const add = (id, g, label) => { if (!id || id === 0xFFFF) return; if (id >= 0xC000 && !this.ed) return;
+      let e = list.get(id); if (!e) { e = { id, g, l: [] }; list.set(id, e); } if (!e.l.includes(label)) e.l.push(label);
+      const order = ['conv', 'msg', 'menu', 'kw', 'name', 'other']; if (order.indexOf(g) < order.indexOf(e.g)) e.g = g; };
+    const kwName = k => { const d = this.decode(rw(u8, 0x8D8000 + 2 * k)); return d ? String.fromCharCode(...d.codes).replace(/\|/g, '') : '#' + k; };
+    const topic = (t, kws) => ({ 0xFF: 'greeting', 0xFE: 'Talk', 0xFD: 'default answer' }[t] || ('keyword "' + (t < 64 ? kwName(t) : '#' + t) + '"')) + (kws.length ? ' (needs ' + kws.map(k => '"' + kwName(k) + '"').join(', ') + ')' : '');
+    for (let n = 0; n < (meta.nconv || 139); n++) {
+      const base = 0x8D0000 | rw(u8, 0x80947A + 2 * n); let y = 4;
+      const ppl = (meta.conv_people[n] || []).join(', ') || 'conversation ' + n;
+      for (let k = 0; k < 80; k++) {
+        const t = rb(u8, base + y); if (t === 0xF8) break;
+        const ln = rb(u8, base + y + 1), fl = rb(u8, base + y + 2), nk = fl & 15, kws = [];
+        for (let i = 0; i < nk; i++) kws.push(rb(u8, base + y + 3 + i));
+        let q = base + y + 3 + nk; if (fl & 0x80) q += 2;
+        const tid = rw(u8, q);
+        add(tid, 'conv', ppl + ' · ' + topic(t, kws) + (tid >= 0xC000 ? ' (Expanded Dialogue)' : ''));
+        if (!ln) break; y += 1 + ln;
+      }
+    }
+    for (let i = 0; i < 0x264; i++) { const u = meta.msg_users[i] || [], mid = rw(u8, 0x80D980 + 2 * i); add(mid, 'msg', 'Message ' + i + (u.length ? ': ' + u.slice(0, 3).join('; ') + (u.length > 3 ? ' +' + (u.length - 3) + ' more' : '') : ' (engine or menus)'));  const me = list.get(mid); if (me && !(me.msg = me.msg || []).includes(i)) me.msg.push(i); }
+    for (let k = 0; k < 64; k++) add(rw(u8, 0x8D8000 + 2 * k), 'kw', 'Keyword ' + k);
+    for (let s = 0; s < 0x113; s++) add(rw(u8, 0x8CEFB0 + 6 * s), 'name', 'Hover name of sprite $' + s.toString(16).toUpperCase().padStart(2, '0'));
+    for (let i = 0; i < 13; i++) add(rw(u8, 0x809705 + 2 * i), 'name', 'Runner name ' + i);
+    for (const [hid, wins] of Object.entries(meta.eng_win || {})) { const ws = wins.map(w => w[0] + '×' + w[1]); add(parseInt(hid, 16), 'menu', 'Game menu or screen, window ' + [...new Set(ws)].slice(0, 3).join(', ') + ' tiles'); }
+    for (const id of meta.other || []) if (!(meta.eng_win || {})[id.toString(16).toUpperCase().padStart(4, '0')]) add(id, 'other', 'Not referenced by anything known (may be unused)');
+    const out = [];
+    for (const e of list.values()) { const d = this.decode(e.id); if (d && d.codes.length <= 1500) { e.codes = d.codes; e.bytes = d.bytes; e.ptr = this.ptr(e.id); e.base = this.basePtr(e.id); out.push(e); } }
+    out.sort((a, b) => a.id - b.id);
+    return out;
+  }
+}
+
+// ---- string <-> codes. Printable ASCII as is; other glyphs as {XX} (hex code).
+function toCodes(s) {
+  const out = []; let i = 0;
+  while (i < s.length) {
+    const m = /^\{([0-9A-Fa-f]{2})\}/.exec(s.slice(i));
+    if (m) { out.push(parseInt(m[1], 16)); i += 4; continue; }
+    const ch = s[i]; i++;
+    if (ch === '\n' || ch === '\r') { out.push(32); continue; }
+    out.push(ch.charCodeAt(0));
+  }
+  return out;
+}
+function fromCodes(codes) { return codes.map(c => (c >= 32 && c < 127 && c !== 123 && c !== 125) ? String.fromCharCode(c) : '{' + c.toString(16).toUpperCase().padStart(2, '0') + '}').join(''); }
+
+// ---- writing
+function hookCode() {
+  const b = [], lab = {}, fix = [];
+  const emit = (...x) => b.push(...x), here = () => b.length;
+  const long = (op, a) => emit(op, a & 0xFF, (a >> 8) & 0xFF, a >> 16);
+  const br = (op, name) => { emit(op, 0); fix.push([b.length - 1, name]); };
+  emit(0x08, 0xC2, 0x30, 0x48, 0xDA, 0xA2, 0x00, 0x00);          // php; rep #$30; pha; phx; ldx #0
+  lab.loop = here(); emit(0x8A); long(0xCF, TABLE); br(0xB0, 'done'); // txa; cmp.l TABLE; bcs done
+  long(0xBF, TABLE + 2); emit(0xC5, 0xCF); br(0xD0, 'next');         // lda.l TABLE+2,x; cmp $CF; bne next
+  long(0xBF, TABLE + 3); emit(0xC5, 0xD0); br(0xD0, 'next');         // lda.l TABLE+3,x; cmp $D0; bne next
+  long(0xBF, TABLE + 5); emit(0x85, 0xCF);                           // lda.l TABLE+5,x; sta $CF
+  long(0xBF, TABLE + 6); emit(0x85, 0xD0); br(0x80, 'done');         // lda.l TABLE+6,x; sta $D0; bra done
+  lab.next = here(); emit(0x8A, 0x18, 0x69, 0x06, 0x00, 0xAA); br(0x80, 'loop');
+  lab.done = here(); emit(0xFA, 0x68, 0x28, 0xF4, 0x7E, 0x7E, 0xAB); long(0x5C, 0x80FE48); // plx; pla; plp; pea $7E7E; plb; jml $80FE48
+  for (const [at, name] of fix) { const d = lab[name] - (at + 1); if (d < -128 || d > 127) throw new Error('branch'); b[at] = d & 0xFF; }
+  return Uint8Array.from(b);
+}
+// edits: Map(id -> codes). inv: inventory (for slot sizes). Returns {rom, report}
+function applyTextEdits(romU8, inv, edits) {
+  let out = new Uint8Array(romU8); const T = new Texts(out), report = [];
+  // spans of every known text at its BASE pointer, to know how much room each one has in place
+  const spans = [];
+  for (const e of inv) { if (e.base == null) continue; const d = T.decodeAt(e.base); if (d) spans.push([e.base, e.base + d.bytes, e.id]); }
+  spans.sort((a, b) => a[0] - b[0]);
+  const roomAt = base => {               // bytes free from base until the next text starts; 0 if base is inside another text
+    let room = Infinity;
+    for (const [s, e] of spans) {
+      if (s < base && e > base) return 0;
+      if (s > base && (s >> 16) === (base >> 16)) { room = Math.min(room, s - base); }
+    }
+    if (room === Infinity) { const d = T.decodeAt(base); room = d ? d.bytes : 0; }
+    return room;
+  };
+  const pool = new Map();    // base ptr -> bytes (texts that must live in the pool)
+  for (const [base, p] of T.redirects) {                    // keep earlier relocations that are not edited now
+    const id = inv.find(e => e.base === base); if (id && edits.has(id.id)) continue;
+    const d = T.decodeAt(p); if (d) pool.set(base, out.slice(L(p), L(p) + d.bytes));
+  }
+  for (const [id, codes] of edits) {
+    if (codes.length > MAXLEN) throw new Error('text $' + id.toString(16) + ' is longer than ' + MAXLEN + ' characters');
+    const base = T.basePtr(id); if (base == null) throw new Error('unknown text id ' + id);
+    const enc = T.encode(codes), room = roomAt(base);
+    if (enc.length <= room) { out.set(enc, L(base)); pool.delete(base); report.push({ id, where: 'in place', size: enc.length, room }); }
+    else { pool.set(base, enc); report.push({ id, where: 'moved', size: enc.length, room }); }
+  }
+  if (pool.size || T.hooked) {
+    if (out.length < 0x200000) { const big = new Uint8Array(0x200000); big.set(out); out = big; out[0x7FD7] = 0x0B; }
+    // hook + table + pool, rebuilt from scratch
+    for (let bk = POOL_FIRST; bk <= POOL_LAST; bk++) out.fill(0, L((bk << 16) | 0x8000), L((bk << 16) | 0x8000) + 0x8000);
+    out.fill(0, L(HOOK), L(HOOK) + 0x8000);
+    out.set(hookCode(), L(HOOK));
+    let bank = POOL_FIRST, addr = 0x8000, o = 0;
+    const entries = [...pool].sort((a, b) => a[0] - b[0]);
+    if (entries.length * 6 + 2 > 0x7E00) throw new Error('too many moved texts');
+    for (const [base, bytes] of entries) {
+      if (addr + bytes.length + 2 > 0x10000) { bank++; addr = 0x8000; }
+      if (bank > POOL_LAST) throw new Error('text pool full');
+      const p = (bank << 16) | addr; out.set(bytes, L(p)); addr += bytes.length + 1;   // +1: the decoder reads words
+      const t = L(TABLE + 2 + o); out[t] = base & 0xFF; out[t + 1] = (base >> 8) & 0xFF; out[t + 2] = base >> 16; out[t + 3] = p & 0xFF; out[t + 4] = (p >> 8) & 0xFF; out[t + 5] = p >> 16;
+      o += 6;
+      const r = report.find(x => x.where === 'moved' && T.basePtr(x.id) === base); if (r) r.addr = p;
+    }
+    out[L(TABLE)] = o & 0xFF; out[L(TABLE) + 1] = o >> 8;
+    out[L(0x80FE44)] = 0x5C; out[L(0x80FE45)] = HOOK & 0xFF; out[L(0x80FE46)] = (HOOK >> 8) & 0xFF; out[L(0x80FE47)] = HOOK >> 16;
+  }
+  return { rom: out, report };
+}
+
+// ---- font preview: glyph rows for char code c (8 rows, 1bpp, MSB = left) and width in pixels
+function glyph(u8, c) { const rows = []; for (let y = 0; y < 8; y++) rows.push(u8[L(0x95F2D0 + c * 8 + y)]); return { rows, w: u8[L(0x81ABC8 + c)] }; }
+
+const api = { Texts, toCodes, fromCodes, applyTextEdits, glyph, hookCode, MAXLEN };
+if (typeof module !== 'undefined') module.exports = api; else root.ST = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script type="application/json" id="meta">{"conv_people": {"0": ["Arena owner", "arena manager"], "1": ["Arena owner", "arena manager"], "2": ["hmmm...."], "5": ["Arena owner", "arena manager"], "7": ["Arena owner", "arena manager"], "10": ["Club Manager"], "12": ["Arena owner", "arena manager"], "17": ["Business Man"], "22": ["Street Doc"], "29": ["Street Doc", "street doc"], "30": ["Street Doc", "street doc"], "31": ["Cruel man"], "35": ["Secretary"], "36": ["Doggie"], "37": ["Dog spirit"], "38": ["Dog spirit"], "40": ["Mage"], "42": ["Hotel Manager"], "45": ["Jester Spirit"], "47": ["Boat driver"], "54": ["Vladimir"], "55": ["Vladimir"], "56": ["Vampire!"], "57": ["Vampire!"], "72": ["Shady character...", "Glutman"], "77": ["Mortician"], "78": ["Mortician"], "79": ["Mortician"], "80": ["Mortician"], "88": ["talks: \"Hey plughead! Yeah you! Get over 'ere... I wanna...\""], "89": ["Indian Shaman"], "92": ["The King"], "104": ["Magic user"], "114": ["Kitsune", "runner AI"], "115": ["Jester Spirit"], "124": ["Decker"], "132": ["Gang Leader"], "137": ["Ferocious Orc"]}, "msg_users": {"0": ["script $06E (shows: \"Too far away.\")", "script $26C (shows: \"Too far away.\")", "script $385 (Vampire!)"], "2": ["script $0C8 (shows: \"Not enough money!\")", "script $143 (Street Doc, conversation 125 topic script)", "script $28C (display-case shop item)", "script $2CC (street doc cyberware purchase)"], "4": ["script $337 (Happy Customer)"], "6": ["script $00D (A waitress)", "script $1D9 (Jake, Jake's control script)"], "7": ["script $1F6 (Jester Spirit)"], "8": ["script $357 (Club patron...)"], "9": ["script $357 (Club patron...)"], "11": ["script $1C1 (Club Manager)"], "13": ["script $199 (Heavy Bouncer)"], "14": ["script $199 (Heavy Bouncer)", "script $38D (shows: \"Nothing special here.\")"], "15": ["script $0F9 (save game)", "script $2BC (A Busy Man)"], "16": ["script $23F (shows: \"Give to:\")"], "18": ["script $1FB (shows: \"Throw at:\")"], "19": ["script $252 (shows: \"Target:\")", "script $2E3 (Club Manager)"], "20": ["script $011 (weapon item: Strength check + equip)", "script $320 (armor item: Strength check + equip)"], "21": ["script $28C (display-case shop item)"], "22": ["script $011 (weapon item: Strength check + equip)", "script $320 (armor item: Strength check + equip)"], "23": ["script $09E (Street Doc)"], "24": ["script $09E (Street Doc)", "script $206 (Video Phone)"], "25": ["script $206 (Video Phone)"], "26": ["script $2AB (Credstick)"], "27": ["script $03D (Mage)"], "32": ["script $27C (Cruel man)"], "33": ["script $116 (Dog Food)", "script $1D6 (Street kid)"], "34": ["script $110 (Club Manager)", "script $2F8 (shows: \"ADIOS!\")"], "37": ["script $28C (display-case shop item)"], "38": ["script $1BF (Beretta Pistol)"], "39": ["script $092 (Loyal citizen)"], "41": ["script $14B (Shopkeeper)"], "46": ["script $127 (Boat driver)"], "48": ["script $025 (Helicopter Pilot)"], "49": ["script $2E4 (Club Manager)"], "50": ["script $33A (Orc)"], "51": ["script $33F (Customer)"], "52": ["script $347 (Customer)"], "56": ["script $385 (Vampire!)"], "57": ["script $336 (Mortician)", "script $385 (Vampire!)"], "58": ["script $336 (Mortician)", "script $386 (Club Manager)"], "59": ["script $386 (Club Manager)"], "61": ["script $19E (Jester Spirit)"], "62": ["script $19E (Jester Spirit)"], "63": ["script $384 (Helicopter Pilot)"], "64": ["script $1B3 (JAKE)", "script $38A (Scientist)"], "65": ["script $107 (Loyal citizen)", "script $1B3 (JAKE)"], "66": ["script $100 (A Busy Man)", "script $1B3 (JAKE)"], "67": ["script $2A3 (Wooden Door)", "script $2EA (shows: \"There is nobody here, but us... mice!\")"], "68": ["script $14E (A Busy Man)", "script $2A3 (Wooden Door)"], "69": ["script $01B (Well dressed...)", "script $1D5 (Orc)"], "70": ["script $177 (Dancing Hippie!)"], "72": ["script $12C (Samurai Warrior)"], "73": ["script $206 (Video Phone)", "script $2CB (She's choosing...)"], "74": ["script $05E (Dwarf)", "script $206 (Video Phone)"], "75": ["script $396 (shows: \"There is no answer.\")"], "77": ["script $206 (Video Phone)"], "78": ["script $1D5 (Orc)", "script $354 (Leather Jacket)"], "81": ["script $222 (A Busy Man)", "script $2A7 (A Busy Man)"], "82": ["script $0F6 (A Busy Man)", "script $2AE (A Busy Man)"], "83": ["script $0F6 (A Busy Man)", "script $2B5 (A Busy Man)"], "84": ["script $222 (A Busy Man)", "script $2B9 (A Busy Man)"], "85": ["script $03B (Gang member)"], "86": ["script $043 (Gang member)"], "87": ["script $094 (Secretary)", "script $278 (Mortician)"], "88": ["script $336 (Mortician)"], "89": ["script $278 (Mortician)"], "90": ["script $278 (Mortician)"], "91": ["script $1F4 (Gang member)", "script $20F (shows: \"Hey look buddy, I haven't got time at the moment...\")", "script $212 (shows: \"Hey look buddy, I haven't got time at the moment...\")", "script $216 (shows: \"Hey look buddy, I haven't got time at the moment...\")", "script $278 (Mortician)"], "93": ["script $1ED (Grinder, conversation 80 topic script)", "script $1FD (Street dweller)"], "94": ["script $0EE (shows: \"Hey! You!\")", "script $201 (shows: \"Hey! You!\")", "script $2C1 (Decker)", "script $2D6 (Ferocious Orc)"], "95": ["script $204 (Street kid)", "script $362 (Video Phone)"], "96": ["script $1D7 (Elevator Door)", "script $208 (Street scum)"], "97": ["script $30B (Seems familiar...)", "script $31F (Little boy)"], "98": ["script $30B (Seems familiar...)"], "99": ["script $169 (Street Scum, Street scum)", "script $346 (Street scum, Street kid)"], "100": ["script $139 (shows: \"Tenth Street Station.\")"], "101": ["script $13D (shows: \"Oldtown Station.\")"], "102": ["script $13F (shows: \"Daley Station.\")"], "103": ["script $351 (shows: \"Grim Reaper Club.\")"], "104": ["script $2D3 (shows: \"The Cage.\")"], "105": ["script $0ED (shows: \"Sputnik Club\")"], "106": ["script $190 (Indian Shaman)"], "107": ["script $30B (Seems familiar...)"], "108": ["script $266 (Memo)"], "109": ["script $1C6 (Video Phone)"], "110": ["script $1C6 (Video Phone)"], "111": ["script $1C6 (Video Phone)"], "112": ["script $1C6 (Video Phone)"], "113": ["script $1C6 (Video Phone)"], "114": ["script $0E8 (Filing Cabinet)"], "115": ["script $1CC (Maria Mercurial)"], "116": ["script $1CC (Maria Mercurial)"], "123": ["script $190 (Indian Shaman)", "script $36D (Scary Ghoul)"], "124": ["script $141 (Doggie)"], "125": ["script $141 (Doggie)", "script $2FB (Club Manager)"], "126": ["script $003 (Street Scum)", "script $2C6 (hmmm....)"], "127": ["script $1C1 (Club Manager)"], "128": ["script $008 (Street kid)", "script $059 (Iced Tea)"], "129": ["script $0CD (Indian Shaman)", "script $126 (Matchbox)"], "130": ["script $33B (Scalpel)"], "131": ["script $1BB (Magic Fetish)"], "132": ["script $1D0 (Dog Collar)"], "133": ["script $133 (Slab)"], "134": ["script $133 (Slab)"], "135": ["script $058 (Torn Paper)"], "136": ["script $18C (A waitress)", "script $245 (Ripped Note)"], "137": ["script $04C (shows: \"This cabinet is locked.\")"], "138": ["script $04C (shows: \"This cabinet is locked.\")", "script $0E8 (Filing Cabinet)"], "141": ["script $03C (Slap Patch)", "script $233 (shows: \"This is a healing patch.\")", "script $314 (Slap Patch)"], "142": ["script $2AB (Credstick)"], "143": ["script $38E (Tickets)"], "144": ["script $293 (Door Key)"], "145": ["script $295 (Wooden Door)"], "146": ["script $298 (Wooden Door)"], "147": ["script $29D (Wooden Door)"], "148": ["script $2A0 (Wooden Door)"], "149": ["script $2A4 (Wooden Door)"], "150": ["script $2A8 (Wooden Door)"], "153": ["script $200 (Ghoul Bone)"], "154": ["script $17F (Serpent Scales)"], "155": ["script $006 (Automatic Door)", "script $0A8 (Wooden Door)", "script $0C5 (Door)", "script $142 (Door)", "script $146 (Wooden Door)", "script $147 (shows: \"This door is locked.\")", "script $17A (Wooden Door)", "script $1A1 (Door)", "script $1DC (Automatic Door)", "script $276 (Door)", "script $295 (Wooden Door)", "script $298 (Wooden Door)", "script $29D (Wooden Door)", "script $2A0 (Wooden Door)", "script $2A4 (Wooden Door)", "script $2A8 (Wooden Door)", "script $377 (shows: \"This door is locked.\")"], "156": ["script $147 (shows: \"This door is locked.\")"], "157": ["script $193 (Shades)"], "158": ["script $193 (Shades)"], "159": ["script $2B8 (LoneStar Badge)"], "160": ["script $2B8 (LoneStar Badge)"], "161": ["script $2DF (Video Phone)"], "162": ["script $084 (Jamaican)"], "163": ["script $084 (Jamaican)"], "166": ["script $0D5 (Large orc)"], "167": ["script $087 (Bulletin Board)"], "168": ["script $199 (Heavy Bouncer)"], "169": ["script $199 (Heavy Bouncer)"], "170": ["script $357 (Club patron...)"], "171": ["script $09E (Street Doc)"], "172": ["script $1E6 (Examination, conversation 22 topic script)"], "173": ["script $1E6 (Examination, conversation 22 topic script)"], "174": ["script $09E (Street Doc)"], "175": ["script $09E (Street Doc)"], "176": ["script $09E (Street Doc)"], "177": ["script $09E (Street Doc)"], "178": ["script $09E (Street Doc)"], "179": ["script $2D7 (Bulletin Board)"], "180": ["script $2D7 (Bulletin Board)"], "181": ["script $1BD (conversation 72 topic script)"], "182": ["script $1BD (conversation 72 topic script)"], "183": ["script $04D (Lone Star, conversation 16 topic script)"], "184": ["script $04D (Lone Star, conversation 16 topic script)"], "185": ["script $04D (Lone Star, conversation 16 topic script)"], "186": ["script $04D (Lone Star, conversation 16 topic script)"], "187": ["script $1FE (Heal, conversation 97 topic script)"], "188": ["script $1FE (Heal, conversation 97 topic script)"], "189": ["script $1FE (Heal, conversation 97 topic script)"], "190": ["script $1FE (Heal, conversation 97 topic script)"], "191": ["script $1A3 (Heal, conversation 28 topic script)"], "192": ["script $1A3 (Heal, conversation 28 topic script)"], "193": ["script $1A3 (Heal, conversation 28 topic script)"], "194": ["script $1A3 (Heal, conversation 28 topic script)"], "195": ["script $391 (Firearms, conversation 16 topic script)"], "196": ["script $391 (Firearms, conversation 16 topic script)"], "197": ["script $391 (Firearms, conversation 16 topic script)"], "198": ["script $391 (Firearms, conversation 16 topic script)"], "199": ["script $1E4 (Arena owner, arena manager)"], "200": ["script $279 (Negotiation, conversation 0 topic script)"], "201": ["script $279 (Negotiation, conversation 0 topic script)"], "202": ["script $279 (Negotiation, conversation 0 topic script)"], "203": ["script $279 (Negotiation, conversation 0 topic script)"], "204": ["script $279 (Negotiation, conversation 0 topic script)"], "205": ["script $259 (shows: \"Hey, where do you think you're going?\")"], "206": ["script $0C3 (conversation 92 topic script)"], "207": ["script $0C3 (conversation 92 topic script)"], "208": ["script $0D7 (King, conversation 0 topic script)"], "209": ["script $0D7 (King, conversation 0 topic script)"], "210": ["script $299 (arena prize)"], "211": ["script $299 (arena prize)"], "215": ["script $0C3 (conversation 92 topic script)"], "217": ["script $0C3 (conversation 92 topic script)"], "222": ["script $0D7 (King, conversation 0 topic script)"], "225": ["script $118 (arena offer yes/no)"], "226": ["script $118 (arena offer yes/no)"], "227": ["script $0D7 (King, conversation 0 topic script)"], "228": ["script $0C3 (conversation 92 topic script)"], "229": ["script $0C3 (conversation 92 topic script)"], "230": ["script $131 (Orc)"], "231": ["script $2DB (Magic user)"], "232": ["script $18D (shows: \"Where are you taking me? And why did you have to...\")"], "233": ["script $18D (shows: \"Where are you taking me? And why did you have to...\")"], "234": ["script $18D (shows: \"Where are you taking me? And why did you have to...\")"], "238": ["script $2B1 (shows: \"Jake is dead.\")"], "239": ["script $2B1 (shows: \"Jake is dead.\")"], "240": ["script $042 (Mortician)"], "241": ["script $229 (Mortician)"], "242": ["script $2EC (shows: \"Don't hurt us! Keep away.\")"], "243": ["script $2EC (shows: \"Don't hurt us! Keep away.\")"], "244": ["script $183 (shows: \"This isn't the end, Armitage!\")"], "245": ["script $183 (shows: \"This isn't the end, Armitage!\")"], "246": ["script $0BB (ending scene step 3)"], "247": ["script $0BB (ending scene step 3)"], "248": ["script $26F (ending recap scene)"], "249": ["script $1E5 (shows: \"We could not allow you to escape. We HAD to stop...\")"], "250": ["script $1C9 (shows: \"Tell me Jake, did you guess or did you know?\")"], "251": ["script $28A (shows: \"It turned out wrong for me, that's all!\")"], "253": ["script $373 (shows: \"Why do you run? I will not hurt you, Jake. You k...\")"], "254": ["script $28C (display-case shop item)"], "255": ["script $28C (display-case shop item)"], "256": ["script $28C (display-case shop item)"], "260": ["script $349 (Black Bottle)"], "261": ["script $349 (Black Bottle)"], "262": ["script $291 (Potion Bottles)"], "263": ["script $291 (Potion Bottles)"], "264": ["script $291 (Potion Bottles)"], "265": ["script $291 (Potion Bottles)"], "266": ["script $296 (Paperweight)"], "267": ["script $057 (Stake)"], "271": ["script $1F6 (Jester Spirit)"], "272": ["script $22A (Laughlyn, conversation 62 topic script)"], "273": ["script $19E (Jester Spirit)"], "274": ["script $0DD (Scientist)"], "275": ["script $0DD (Scientist)"], "280": ["script $0DE (Scientist)"], "281": ["script $2D4 (shows: \"The door is secured by IC program.\")"], "282": ["script $19D (Computer)", "script $25C (shows: \"This terminal is not accessible.\")"], "283": ["script $2D4 (shows: \"The door is secured by IC program.\")", "script $341 (shows: \"The panel logo reads: D-G-C\")"], "284": ["script $2CD (shows: \"Sub-level door program modified.\")"], "285": ["script $13E (shows: \"Oh look man, you come any closer and I blow ever...\")"], "286": ["script $0E3 (Drake, conversation 63 topic script)"], "287": ["script $02B (shows: \"Next Stop:\")"], "292": ["script $02B (shows: \"Next Stop:\")"], "293": ["script $1E3 (conversation 16 topic script)"], "294": ["script $1E3 (conversation 16 topic script)"], "295": ["script $1E3 (conversation 16 topic script)"], "296": ["script $1E3 (conversation 16 topic script)"], "297": ["script $1E3 (conversation 16 topic script)"], "298": ["script $1E3 (conversation 16 topic script)"], "299": ["script $1E3 (conversation 16 topic script)"], "300": ["script $1E3 (conversation 16 topic script)"], "301": ["script $1E3 (conversation 16 topic script)"], "302": ["script $1E3 (conversation 16 topic script)"], "317": ["script $0A4 (Strobes, conversation 49 topic script)"], "318": ["script $0A4 (Strobes, conversation 49 topic script)"], "319": ["script $162 (hire runner)"], "320": ["script $1AD (runner AI)", "script $328 (runner AI (mages))"], "321": ["script $10E (shows: \"We will wait outside Jake.\")"], "322": ["script $10E (shows: \"We will wait outside Jake.\")"], "323": ["script $097 (ending roll call)"], "396": ["script $1F1 (shows: \"Oh wow, this should be fun.\")"], "397": ["script $09A (Mage)"], "398": ["script $300 (Orc)"], "399": ["script $2D2 (Mercenary)"], "400": ["script $050 (Dwarf)"], "401": ["script $102 (Decker)", "script $3A7 (Decker)"], "402": ["script $380 (Dog, conversation 113 topic script)"], "403": ["script $380 (Dog, conversation 113 topic script)"], "404": ["script $0E5 (Secretary)"], "406": ["script $0C4 (Street Doc, street doc)"], "407": ["script $0C4 (Street Doc, street doc)"], "408": ["script $0C4 (Street Doc, street doc)"], "409": ["script $0F8 (Cyberware, conversation 29 topic script)"], "410": ["script $0F8 (Cyberware, conversation 29 topic script)"], "412": ["script $127 (Boat driver)"], "418": ["script $143 (Street Doc, conversation 125 topic script)"], "419": ["script $2FB (Club Manager)"], "420": ["script $27C (Cruel man)"], "422": ["script $096 (Spatter)"], "423": ["script $06D (Hotel Manager)"], "425": ["script $06D (Hotel Manager)"], "442": ["script $0E6 (Pool of Ink)"], "443": ["script $1E0 (Strobe)"], "444": ["script $057 (Stake)"], "445": ["script $0F2 (Iron Key)", "script $138 (Safe Key)"], "446": ["script $226 (Bronze Key)"], "447": ["script $163 (Toxic Water)"], "448": ["script $03D (Mage)"], "449": ["script $0C4 (Street Doc, street doc)"], "450": ["script $2B3 (Well dressed...)", "script $303 (Dancing Hippie!)"], "452": ["script $1F7 (Dog spirit)"], "453": ["script $1F7 (Dog spirit)"], "454": ["script $1F7 (Dog spirit)"], "455": ["script $1F7 (Dog spirit)"], "456": ["script $1F7 (Dog spirit)"], "457": ["script $1F7 (Dog spirit)"], "468": ["script $124 (Bronze Gate)"], "473": ["script $161 (shows: \"Wastelands.........\")"], "474": ["script $18B (shows: \"Jagged Nails.......\")"], "475": ["script $385 (Vampire!)"], "476": ["script $23B (Cyberdeck)"], "479": ["script $073 (Password)"], "480": ["script $38F (Password)"], "482": ["script $2C7 (Grenade)"], "483": ["script $027 (Gang Leader)"], "484": ["script $2D1 (Massive Orc, Ferocious Orc)"], "499": ["script $027 (Gang Leader)"], "500": ["script $3A5 (Nuyen)"], "501": ["script $0D6 (Nuyen)"], "502": ["script $385 (Vampire!)"], "503": ["script $051 (Switch)", "script $165 (shows: \"It looks similar to a light switch.\")", "script $309 (Switch)"], "504": ["script $13C (Door)"], "505": ["script $344 (shows: \"It's electronically sealed.\")"], "506": ["script $0BF (Vampire!)"], "507": ["script $1D3 (Leaves)"], "508": ["script $29F (Mermaid Scales)"], "509": ["script $304 (Dog Tag)"], "510": ["script $37A (Crowbar)"], "511": ["script $37A (Crowbar)"], "512": ["script $399 (Green Bottle)"], "513": ["script $115 (Explosives)"], "514": ["script $21D (Time Bomb)"], "515": ["script $2EF (Detonator)"], "516": ["script $115 (Explosives)"], "517": ["script $05D (Broken Bottle)"], "518": ["script $309 (Switch)"], "519": ["script $309 (Switch)"], "520": ["script $051 (Switch)"], "521": ["script $051 (Switch)"], "522": ["script $051 (Switch)"], "523": ["script $051 (Switch)"], "524": ["script $309 (Switch)"], "526": ["script $124 (Bronze Gate)"], "527": ["script $329 (Safe)"], "528": ["script $0D1 (shows: \"DATA FILE OBTAINED.\")", "script $0FE (shows: \"DATA FILE OBTAINED.\")"], "529": ["script $0D1 (shows: \"DATA FILE OBTAINED.\")", "script $0FE (shows: \"DATA FILE OBTAINED.\")"], "530": ["script $31B (shows: \"TRASH DATA DISCARDED.\")"], "532": ["script $0FC (shows: \"ELEVATOR ACTIVATED.\")"], "533": ["script $256 (Computer)"], "534": ["script $24E (Computer)"], "549": ["script $265 (DF_DR 4-4, DF_DR 3-4)"], "550": ["script $0D9 (DF_MT-AI)"], "551": ["script $0DA (DF_DB-Jester)"], "552": ["script $1DF (DF_DR-MATRIX)"], "553": ["script $0E1 (DF_DR-VOLCANO)"], "554": ["script $269 (DF_AN-PAYMENT)"], "555": ["script $272 (DF_AN-ANTI-AI)"], "556": ["script $02A (DF_DS-PUSHKIN)"], "557": ["script $37E (DF_DS-FAILURE)"], "558": ["script $338 (DF_DS-AI END)"], "559": ["script $1E7 (DF_DS-TARGET)"], "560": ["script $11F (DF_DS-AKIMI)"], "561": ["script $004 (DF_BADNEWS)"], "562": ["script $137 (shows: \"WARNING: 20 Seconds until detonation.\")"], "563": ["script $2C8 (Troll Decker, Mage)"], "564": ["script $2C8 (Troll Decker, Mage)"], "565": ["script $2C8 (Troll Decker, Mage)"], "566": ["script $051 (Switch)"], "567": ["script $0A9 (Dancing Hippie!)"], "568": ["script $010 (Samurai Warrior)"], "573": ["script $010 (Samurai Warrior)"], "574": ["script $017 (Samurai Warrior)"], "582": ["script $1F2 (Troll Decker)"], "584": ["script $1F2 (Troll Decker)"], "587": ["script $09D (shows: \"I will teach you the meaning of pain, fool!\")"], "588": ["script $09D (shows: \"I will teach you the meaning of pain, fool!\")"], "589": ["script $0A2 (shows: \"I will avenge you brother!\")"], "590": ["script $371 (Mage)"], "591": ["script $371 (Mage)"], "593": ["script $0A3 (Ferocious Orc)"], "595": ["script $0A3 (Ferocious Orc)"], "596": ["script $00F (shows: \"I can see you!\")", "script $0EF (shows: \"I can see you!\")"], "601": ["script $38B (Akimi)"], "602": ["script $105 (AI Computer)"], "603": ["script $25C (shows: \"This terminal is not accessible.\")"], "604": ["script $042 (Mortician)"], "605": ["script $042 (Mortician)"], "606": ["script $042 (Mortician)"], "607": ["script $042 (Mortician)"], "608": ["script $11D (shows: \"Winter CES'93 Las Vegas - Warp!\")"], "609": ["script $1E3 (conversation 16 topic script)"], "610": ["script $1E3 (conversation 16 topic script)"], "611": ["script $1E3 (conversation 16 topic script)"]}, "other": [28824, 28853, 28864, 28875, 28880, 28888, 28893, 28897, 28902, 28908, 28913, 28918, 28922, 28927, 28934, 28944, 28947, 28951, 28961, 28968, 28978, 28987, 28993, 28999, 29007, 29027, 29036, 29039, 29049, 29058, 29066, 29070, 29076, 29093, 29114, 29129, 29144, 29187, 29194, 29245, 29249, 29264, 29299, 29320, 29362, 29392, 29413, 29427, 29442, 29466, 29472, 29478, 29486, 29517, 29535, 29553, 29571, 29589, 29611, 29665, 29684, 29727, 29738, 29765, 29783, 29791, 29798, 29805, 29828, 29851, 29857, 29863, 29873, 29879, 29892, 29904, 29917, 29925, 29933, 29944, 29968, 30007, 32761], "nconv": 139, "msg_win": {"0": [["f", 12, 3, 110]], "2": [["c", 0, 0, 200], ["f", 15, 3, 323], ["f", 16, 3, 652]], "6": [["f", 15, 3, 473]], "7": [["f", 19, 3, 502]], "14": [["f", 16, 3, 909]], "15": [["f", 7, 3, 249]], "16": [["f", 8, 3, 575]], "18": [["f", 9, 3, 507]], "19": [["f", 9, 3, 594]], "20": [["f", 15, 3, 17]], "21": [["f", 6, 3, 652]], "22": [["f", 7, 3, 17]], "24": [["f", 25, 3, 518]], "25": [["f", 23, 3, 518]], "26": [["f", 22, 3, 683]], "33": [["f", 28, 3, 278]], "34": [["f", 6, 3, 760]], "37": [["f", 28, 3, 652]], "38": [["f", 17, 3, 447]], "57": [["f", 13, 3, 822]], "58": [["f", 10, 3, 822]], "64": [["f", 15, 3, 435]], "65": [["f", 17, 3, 435]], "66": [["f", 18, 3, 435]], "67": [["f", 27, 3, 675]], "68": [["f", 26, 3, 675]], "69": [["f", 25, 4, 469]], "72": [["f", 17, 3, 300]], "73": [["f", 15, 3, 518]], "74": [["f", 27, 3, 518]], "75": [["f", 16, 3, 918]], "77": [["f", 22, 3, 518]], "78": [["f", 16, 3, 469]], "79": [["m", 16, 7, 581]], "80": [["m", 16, 7, 346]], "81": [["m", 16, 7, 286]], "83": [["m", 16, 7, 829]], "84": [["m", 16, 7, 807]], "85": [["m", 16, 7, 763]], "86": [["m", 16, 7, 612]], "87": [["f", 15, 3, 632]], "88": [["f", 7, 3, 822]], "89": [["f", 27, 3, 632]], "90": [["f", 20, 3, 632]], "91": [["f", 28, 5, 632]], "93": [["c", 0, 0, 493]], "94": [["f", 9, 3, 705]], "95": [["f", 15, 4, 866]], "96": [["f", 19, 3, 471]], "97": [["f", 14, 3, 779]], "98": [["f", 16, 3, 779]], "99": [["f", 17, 3, 361], ["f", 18, 3, 838]], "100": [["f", 17, 3, 313]], "101": [["f", 13, 3, 317]], "102": [["f", 12, 3, 319]], "103": [["f", 14, 3, 849]], "104": [["f", 9, 3, 723]], "105": [["f", 11, 3, 237]], "106": [["f", 28, 3, 400]], "107": [["f", 21, 3, 779]], "108": [["f", 22, 5, 614]], "109": [["f", 19, 3, 454]], "110": [["f", 23, 3, 454]], "111": [["f", 18, 3, 454]], "112": [["f", 17, 4, 454]], "113": [["f", 8, 3, 454]], "114": [["f", 28, 3, 232]], "115": [["f", 17, 3, 460]], "116": [["f", 13, 3, 460]], "123": [["f", 6, 3, 400]], "124": [["f", 12, 3, 321]], "126": [["f", 19, 4, 710]], "127": [["f", 20, 3, 449]], "128": [["f", 18, 3, 89]], "129": [["f", 25, 4, 294]], "130": [["f", 22, 3, 827]], "131": [["f", 25, 3, 443]], "132": [["f", 14, 3, 464]], "133": [["f", 21, 3, 307]], "134": [["f", 18, 3, 307]], "135": [["f", 25, 3, 88]], "136": [["f", 13, 3, 581]], "137": [["f", 18, 3, 76]], "138": [["f", 22, 3, 76], ["f", 20, 3, 232]], "141": [["f", 18, 3, 60]], "142": [["f", 19, 3, 683]], "143": [["f", 19, 4, 910]], "144": [["f", 17, 4, 659]], "145": [["f", 11, 3, 661]], "146": [["f", 11, 3, 664]], "147": [["f", 11, 3, 669]], "148": [["f", 11, 3, 672]], "149": [["f", 11, 3, 676]], "150": [["f", 11, 3, 680]], "153": [["f", 20, 3, 512]], "154": [["f", 24, 3, 383]], "155": [["f", 16, 3, 6]], "156": [["f", 28, 3, 327]], "157": [["f", 14, 3, 403]], "158": [["f", 18, 3, 403]], "159": [["f", 24, 3, 696]], "160": [["f", 21, 3, 696]], "161": [["f", 19, 3, 735]], "162": [["f", 20, 4, 132]], "163": [["f", 22, 3, 132]], "166": [["f", 17, 3, 213]], "167": [["f", 20, 5, 135]], "168": [["f", 22, 3, 409]], "169": [["f", 17, 3, 409]], "170": [["f", 16, 3, 855]], "171": [["f", 28, 4, 158]], "172": [["c", 0, 0, 486]], "173": [["c", 0, 0, 486]], "174": [["f", 26, 4, 158]], "175": [["f", 7, 3, 158]], "176": [["f", 21, 3, 158]], "177": [["f", 23, 3, 158]], "178": [["f", 24, 3, 158]], "179": [["f", 22, 4, 727]], "180": [["f", 22, 5, 727]], "181": [["c", 0, 0, 445]], "182": [["c", 0, 0, 445]], "183": [["c", 0, 0, 77]], "184": [["c", 0, 0, 77]], "185": [["c", 0, 0, 77]], "186": [["c", 0, 0, 77]], "187": [["c", 0, 0, 510]], "188": [["c", 0, 0, 510]], "189": [["c", 0, 0, 510]], "190": [["c", 0, 0, 510]], "191": [["c", 0, 0, 419]], "192": [["c", 0, 0, 419]], "193": [["c", 0, 0, 419]], "194": [["c", 0, 0, 419]], "195": [["c", 0, 0, 913]], "196": [["c", 0, 0, 913]], "197": [["c", 0, 0, 913]], "198": [["c", 0, 0, 913]], "199": [["f", 25, 3, 484]], "200": [["c", 0, 0, 633]], "201": [["c", 0, 0, 633]], "202": [["c", 0, 0, 633]], "203": [["c", 0, 0, 633]], "204": [["c", 0, 0, 633]], "205": [["f", 28, 3, 601]], "206": [["c", 0, 0, 195]], "207": [["c", 0, 0, 195]], "208": [["c", 0, 0, 215]], "209": [["c", 0, 0, 215]], "210": [["c", 0, 0, 665]], "211": [["c", 0, 0, 665]], "215": [["c", 0, 0, 195]], "217": [["c", 0, 0, 195]], "222": [["c", 0, 0, 215]], "225": [["c", 0, 0, 280]], "226": [["c", 0, 0, 280]], "227": [["c", 0, 0, 215]], "228": [["c", 0, 0, 195]], "229": [["c", 0, 0, 195]], "230": [["f", 20, 3, 305]], "231": [["f", 24, 3, 731]], "232": [["f", 28, 4, 397]], "233": [["f", 28, 3, 397]], "234": [["f", 26, 3, 397]], "238": [["f", 11, 3, 689]], "239": [["f", 9, 3, 689]], "241": [["f", 19, 4, 553]], "242": [["f", 20, 3, 748]], "243": [["f", 26, 3, 748]], "244": [["f", 21, 3, 387]], "245": [["f", 24, 3, 387]], "246": [["f", 27, 4, 187]], "247": [["f", 20, 3, 187]], "248": [["f", 25, 4, 623]], "249": [["f", 25, 4, 485]], "250": [["f", 18, 4, 457]], "251": [["f", 28, 3, 650]], "253": [["f", 27, 4, 883]], "254": [["f", 16, 3, 652]], "255": [["f", 14, 3, 652]], "256": [["f", 12, 3, 652]], "260": [["f", 16, 3, 841]], "261": [["f", 24, 3, 841]], "262": [["f", 19, 3, 657]], "263": [["f", 24, 3, 657]], "264": [["f", 21, 3, 657]], "265": [["f", 29, 3, 657]], "266": [["f", 20, 3, 662]], "267": [["f", 16, 3, 87]], "271": [["f", 19, 3, 502]], "272": [["f", 24, 3, 554]], "273": [["f", 25, 4, 414]], "274": [["f", 24, 5, 221]], "275": [["f", 24, 3, 221]], "280": [["f", 28, 4, 222]], "281": [["f", 27, 3, 724]], "282": [["f", 24, 3, 413]], "283": [["f", 22, 3, 724]], "284": [["f", 24, 3, 717]], "285": [["f", 28, 4, 318]], "286": [["c", 0, 0, 227]], "287": [["f", 9, 3, 43]], "292": [["f", 14, 3, 43]], "293": [["c", 0, 0, 483]], "294": [["c", 0, 0, 483]], "295": [["c", 0, 0, 483]], "296": [["c", 0, 0, 483]], "297": [["c", 0, 0, 483]], "298": [["c", 0, 0, 483]], "299": [["c", 0, 0, 483]], "300": [["c", 0, 0, 483]], "301": [["c", 0, 0, 483]], "302": [["c", 0, 0, 483]], "317": [["c", 0, 0, 164]], "318": [["c", 0, 0, 164]], "319": [["c", 0, 0, 354]], "320": [["f", 25, 4, 429]], "321": [["f", 20, 3, 270]], "322": [["f", 22, 4, 270]], "323": [["f", 19, 3, 151]], "396": [["f", 21, 3, 497]], "397": [["f", 13, 3, 154]], "398": [["f", 29, 3, 768]], "399": [["f", 24, 3, 722]], "400": [["f", 13, 3, 80]], "401": [["f", 16, 3, 258]], "402": [["c", 0, 0, 896]], "403": [["c", 0, 0, 896]], "404": [["f", 20, 3, 229]], "406": [["f", 14, 3, 196]], "407": [["f", 28, 3, 196]], "408": [["f", 26, 5, 196]], "409": [["c", 0, 0, 248]], "410": [["c", 0, 0, 248]], "412": [["f", 26, 3, 295]], "418": [["c", 0, 0, 323]], "419": [["f", 15, 3, 763]], "420": [["f", 20, 3, 636]], "422": [["f", 28, 4, 150]], "423": [["f", 30, 4, 109]], "425": [["f", 17, 3, 109]], "442": [["f", 12, 3, 230]], "443": [["f", 28, 3, 480]], "444": [["f", 21, 3, 87]], "445": [["f", 13, 3, 242]], "446": [["f", 20, 3, 550]], "447": [["f", 16, 3, 355]], "448": [["f", 25, 3, 61]], "449": [["f", 17, 3, 196]], "450": [["f", 6, 3, 691]], "452": [["f", 28, 4, 503]], "453": [["f", 15, 3, 503]], "454": [["f", 15, 3, 503]], "455": [["f", 15, 3, 503]], "456": [["f", 24, 5, 503]], "457": [["f", 27, 4, 503]], "468": [["f", 23, 4, 292]], "473": [["f", 12, 3, 353]], "474": [["f", 13, 3, 395]], "475": [["f", 19, 3, 901]], "476": [["f", 20, 3, 571]], "479": [["f", 26, 3, 115]], "480": [["f", 27, 3, 911]], "482": [["f", 22, 3, 711]], "483": [["f", 22, 3, 39]], "484": [["f", 11, 3, 721]], "499": [["f", 23, 3, 39]], "500": [["f", 11, 3, 933]], "501": [["f", 11, 3, 214]], "502": [["f", 22, 3, 901]], "503": [["f", 25, 3, 81]], "504": [["f", 14, 3, 316]], "505": [["f", 19, 3, 836]], "506": [["f", 27, 3, 191]], "507": [["f", 23, 3, 467]], "508": [["f", 21, 3, 671]], "509": [["f", 16, 3, 772]], "510": [["f", 17, 3, 890]], "511": [["f", 12, 3, 890]], "512": [["f", 27, 3, 921]], "513": [["f", 17, 3, 277]], "514": [["f", 15, 3, 541]], "515": [["f", 19, 3, 751]], "516": [["f", 26, 3, 277]], "517": [["f", 29, 3, 93]], "518": [["f", 16, 3, 777]], "519": [["f", 16, 3, 777]], "520": [["f", 16, 3, 81]], "521": [["f", 16, 3, 81]], "522": [["f", 16, 4, 81]], "523": [["f", 18, 3, 81]], "524": [["f", 19, 3, 777]], "526": [["f", 16, 3, 292]], "527": [["f", 16, 3, 809]], "528": [["f", 16, 3, 209]], "529": [["f", 21, 3, 209]], "530": [["f", 18, 3, 795]], "532": [["f", 16, 3, 252]], "533": [["f", 21, 3, 598]], "534": [["f", 21, 3, 590]], "549": [["f", 21, 3, 613]], "550": [["f", 28, 7, 217]], "551": [["f", 28, 8, 218]], "552": [["f", 28, 8, 479]], "553": [["f", 28, 7, 225]], "554": [["f", 28, 7, 617]], "555": [["f", 28, 7, 626]], "556": [["f", 28, 7, 42]], "557": [["f", 28, 7, 894]], "558": [["f", 28, 7, 824]], "559": [["f", 28, 7, 487]], "560": [["f", 28, 9, 287]], "561": [["f", 28, 7, 4]], "562": [["f", 28, 3, 311]], "563": [["f", 25, 3, 712]], "564": [["f", 24, 3, 712]], "565": [["f", 21, 4, 712]], "566": [["f", 27, 3, 81]], "567": [["f", 18, 4, 169]], "568": [["f", 21, 3, 16]], "573": [["f", 17, 3, 16]], "574": [["f", 13, 3, 23]], "582": [["f", 14, 3, 498]], "584": [["f", 15, 3, 498]], "587": [["f", 17, 4, 157]], "588": [["f", 12, 3, 157]], "589": [["f", 20, 3, 162]], "590": [["f", 20, 4, 881]], "591": [["f", 9, 3, 881]], "593": [["f", 9, 3, 163]], "595": [["f", 6, 3, 163]], "596": [["f", 12, 3, 15]], "601": [["f", 22, 3, 907]], "602": [["f", 16, 3, 261]], "603": [["f", 29, 3, 604]], "604": [["f", 21, 3, 66]], "605": [["f", 25, 3, 66]], "606": [["f", 15, 3, 66]], "607": [["f", 22, 3, 66]], "608": [["f", 28, 3, 285]], "609": [["c", 0, 0, 483]], "610": [["c", 0, 0, 483]], "611": [["c", 0, 0, 483]]}, "eng_win": {"7999": [[21, 4, 0, 0]], "79B1": [[22, 3, 0, 0]], "79C2": [[19, 3, 0, 0]], "79D2": [[24, 4, 0, 0]], "79EC": [[9, 3, 0, 0]], "79F4": [[15, 3, 0, 0]], "7A01": [[17, 3, 0, 0]], "7A0F": [[18, 3, 0, 0]], "70D8": [[30, 26, 1, 11], [16, 9, 1, 1]], "70DD": [[30, 26, 1, 12], [8, 9, 1, 2], [11, 6, 1, 3]], "70E1": [[30, 26, 1, 13], [16, 9, 1, 2]], "70E6": [[30, 26, 1, 14], [16, 9, 1, 3]], "714E": [[30, 26, 15, 11], [30, 26, 15, 12], [30, 26, 13, 12], [30, 26, 14, 11], [30, 5, 14, 2], [30, 5, 23, 2]], "7155": [[30, 26, 1, 16], [11, 3, 0, 0]], "7151": [[30, 26, 1, 18]], "74C2": [[30, 26, 1, 20]], "7163": [[30, 26, 1, 21]], "70F6": [[30, 26, 1, 22], [8, 9, 1, 4]], "716C": [[30, 26, 10, 20], [30, 26, 10, 21], [30, 26, 11, 22]], "70BF": [[30, 26, 10, 21], [30, 26, 10, 22]], "70C8": [[8, 9, 1, 0], [15, 8, 1, 0], [30, 13, 2, 4], [12, 5, 1, 0], [11, 5, 1, 0], [16, 9, 1, 0]], "70EC": [[8, 9, 1, 1]], "70F1": [[8, 9, 1, 3]], "70FA": [[8, 9, 1, 5], [11, 6, 1, 2], [16, 3, 0, 0]], "70FF": [[8, 9, 1, 6]], "70B4": [[8, 9, 0, 0], [15, 8, 0, 0], [30, 13, 1, 4], [8, 9, 0, 1], [15, 8, 0, 1], [6, 4, 0, 0]], "70BD": [[8, 9, 0, 0], [15, 8, 0, 0], [30, 13, 1, 4], [8, 9, 0, 1], [15, 8, 0, 1], [6, 4, 0, 0]], "757C": [[18, 3, 0, 0]], "6D36": [[15, 8, 1, 1]], "7117": [[11, 5, 1, 1], [11, 4, 1, 1], [11, 6, 1, 1]], "7537": [[30, 5, 0, 0], [30, 8, 0, 0], [30, 6, 0, 0], [30, 7, 0, 0]], "7534": [[30, 5, 0, 2], [30, 8, 0, 2], [30, 6, 0, 2], [30, 7, 0, 2]], "74B7": [[15, 3, 0, 0]], "6AE1": [[5, 3, 0, 0]], "712F": [[11, 5, 1, 2]], "7E7A": [[21, 3, 0, 0]], "7E8B": [[18, 3, 0, 0]], "6C45": [[10, 3, 0, 0]], "7104": [[11, 5, 1, 2]], "755E": [[12, 3, 0, 0]], "6EEA": [[5, 3, 0, 0]], "7415": [[30, 26, 10, 20]], "6EA4": [[30, 26, 10, 21], [15, 8, 1, 1]], "6EDA": [[30, 26, 11, 22]], "6DCD": [[15, 8, 1, 1]], "7030": [[15, 8, 1, 2]], "6C3E": [[15, 8, 1, 3], [15, 8, 1, 1]], "6E32": [[15, 8, 1, 4], [15, 8, 1, 2], [15, 8, 1, 1]], "706C": [[15, 8, 1, 5], [15, 8, 1, 3]], "70BA": [[15, 8, 12, 5], [14, 11, 11, 8]], "7121": [[11, 5, 1, 2], [11, 4, 1, 1]], "6AB3": [[4, 3, 0, 0]], "A284": [[29, 3, 0, 0]], "71E5": [[18, 9, 1, 1]], "724D": [[18, 9, 1, 2]], "72C6": [[18, 9, 1, 3]], "732B": [[18, 9, 1, 4]], "7395": [[18, 9, 1, 5]], "7401": [[18, 9, 1, 6]], "6DDE": [[15, 8, 1, 2], [15, 8, 1, 1]], "708B": [[15, 8, 1, 3]], "6E8A": [[15, 8, 1, 4]], "6E4C": [[15, 8, 1, 5]], "06E3": [[9, 3, 0, 0], [30, 8, 0, 3], [30, 7, 0, 3], [30, 6, 0, 3]], "0653": [[7, 3, 0, 0], [30, 8, 0, 4], [30, 7, 0, 4], [30, 7, 0, 3]], "0578": [[5, 3, 0, 0], [30, 8, 0, 5], [30, 7, 0, 4], [30, 6, 0, 3]], "6E98": [[30, 26, 10, 21]], "6EB7": [[30, 26, 11, 22]], "70CC": [[30, 13, 2, 5], [11, 5, 1, 2], [11, 6, 1, 2]], "6F32": [[30, 26, 10, 21]], "6EAF": [[30, 26, 11, 22]], "6DD7": [[9, 3, 0, 0]], "7110": [[11, 5, 1, 2]], "7147": [[11, 6, 1, 3]], "11C5": [[30, 13, 0, 0]], "70D0": [[30, 13, 2, 6]], "11FB": [[30, 13, 0, 0]], "057D": [[14, 11, 1, 0]], "0582": [[14, 11, 1, 1]], "05A5": [[14, 11, 1, 2]], "05AC": [[14, 11, 1, 3]], "05B4": [[14, 11, 1, 1], [14, 11, 1, 4]], "05BC": [[14, 11, 1, 2], [14, 11, 1, 5]], "05C5": [[14, 11, 1, 3], [14, 11, 1, 6]], "05C8": [[14, 11, 1, 4], [14, 11, 1, 7]], "05D4": [[14, 11, 1, 6], [14, 11, 1, 8]], "121D": [[30, 13, 0, 0]], "6B0B": [[11, 3, 0, 0]], "21D6": [[30, 13, 0, 0]], "2216": [[30, 13, 0, 0]], "718A": [[6, 4, 1, 0]], "718E": [[6, 4, 1, 1]], "0595": [[14, 11, 1, 0]], "05CC": [[14, 11, 1, 5]], "05DB": [[14, 11, 1, 7]], "05E1": [[14, 11, 1, 8]], "224A": [[30, 13, 0, 0]], "9BC7": [[30, 13, 0, 0]], "6E01": [[30, 26, 10, 21], [15, 8, 1, 2]], "6D81": [[15, 8, 1, 4]], "6D28": [[15, 8, 1, 5]], "8F07": [[7, 3, 0, 0], [30, 6, 0, 3]], "6A5D": [[10, 3, 0, 0]], "6A7B": [[11, 3, 0, 0]], "745F": [[12, 5, 1, 1]], "7466": [[12, 5, 1, 2]], "744F": [[12, 5, 1, 1]], "7457": [[12, 5, 1, 2]], "74CE": [[11, 6, 1, 1], [16, 3, 0, 0]], "0AD9": [[30, 13, 0, 0]], "0AF6": [[30, 13, 0, 0]], "0B08": [[30, 13, 0, 0]], "0720": [[30, 13, 0, 0]], "0765": [[30, 13, 0, 0]], "8727": [[30, 13, 0, 0]], "8EB8": [[22, 4, 0, 0]], "7C88": [[9, 3, 0, 0]], "7F1D": [[19, 3, 0, 0]], "06EC": [[10, 3, 0, 0]], "A064": [[20, 3, 0, 0]], "1263": [[30, 13, 0, 0]], "7593": [[15, 3, 0, 0]], "7159": [[16, 3, 0, 0]]}}</script>
+<script>
+(() => {
+'use strict';
+const META = JSON.parse(document.getElementById('meta').textContent);
+const $ = id => document.getElementById(id);
+const hex = (n, w = 4) => n.toString(16).toUpperCase().padStart(w, '0');
+const fmtCrc = c => c.toString(16).toUpperCase().padStart(8, '0');
+const crc32 = u8 => { let c, crc = 0xFFFFFFFF; const T = crc32.T || (crc32.T = Array.from({ length: 256 }, (_, n) => { c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; })); for (let i = 0; i < u8.length; i++) crc = T[(crc ^ u8[i]) & 0xFF] ^ (crc >>> 8); return (crc ^ 0xFFFFFFFF) >>> 0; };
+const GROUP = { conv: 'Conversation', msg: 'Message', menu: 'Menu text', kw: 'Keyword', name: 'Name', other: 'Not referenced' };
+const SPECIAL = [0x01, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x0E, 0x0F, 0x10, 0x11, 0x1E, 0x1F, 0x7F];
+const CONV_W = 142, CONV_LINES = 11, MENU_W = 104;
+let romU8 = null, T = null, inv = [], byId = new Map(), romName = '', romCrc = 0, cur = null, group = 'all';
+const edits = new Map();   // id -> codes
+
+function status(text, kind) { const s = $('status'); s.textContent = text; s.className = 'msg' + (kind ? ' ' + kind : ''); }
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+
+async function loadRom(file) {
+  let u8 = new Uint8Array(await file.arrayBuffer());
+  if (u8.length % 0x8000 === 512) u8 = u8.slice(512);
+  const title = String.fromCharCode(...u8.slice(0x7FC0, 0x7FC9));
+  if (title !== 'SHADOWRUN' || u8.length < 0x100000) { status('That file is not a Shadowrun (USA) ROM (title "' + title.trim() + '"). Open the .sfc or .smc file of the US release.', 'err'); return; }
+  romU8 = u8; romName = file.name; romCrc = crc32(u8); T = new ST.Texts(u8); edits.clear();
+  inv = T.inventory(META); byId = new Map(inv.map(e => [e.id, e]));
+  $('romname').textContent = file.name + ' · ' + (u8.length >> 20) + ' MB · CRC ' + fmtCrc(romCrc) + (T.ed ? ' · Expanded Dialogue' : '') + (T.hooked ? ' · ' + T.redirects.size + ' moved texts' : '');
+  $('welcome').hidden = true; $('app').hidden = false; $('projlabel').hidden = false;
+  buildGlyphs();
+  const saved = store.get('sr-text-edits-' + romCrc);
+  if (saved) { try { applyProject(JSON.parse(saved), true); } catch (e) {} }
+  else status(inv.length + ' texts loaded. Search or pick one from the list.', 'ok');
+  fillList(); select(inv.find(e => e.g === 'conv') || inv[0]);
+}
+$('romfile').onchange = e => { if (e.target.files[0]) loadRom(e.target.files[0]); e.target.value = ''; };
+const welcome = $('welcome');
+['dragenter', 'dragover'].forEach(t => document.addEventListener(t, e => { e.preventDefault(); welcome.classList.add('hot'); }));
+['dragleave', 'drop'].forEach(t => document.addEventListener(t, e => { e.preventDefault(); welcome.classList.remove('hot'); }));
+document.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (!f) return; if (/\.json$/i.test(f.name) && romU8) loadProject(f); else loadRom(f); });
+
+const codesOf = e => edits.has(e.id) ? edits.get(e.id) : e.codes;
+const plain = codes => ST.fromCodes(codes).replace(/\|/g, '');
+
+// ------------------------------------------------------------ list
+function fillList() {
+  const q = $('q').value.trim().toLowerCase(), list = $('list'); list.textContent = ''; let n = 0;
+  const frag = document.createDocumentFragment();
+  for (const e of inv) {
+    if (group === 'edited' ? !edits.has(e.id) : (group !== 'all' && e.g !== group)) continue;
+    const s = plain(codesOf(e));
+    if (q && !s.toLowerCase().includes(q) && !e.l.some(x => x.toLowerCase().includes(q)) && hex(e.id).toLowerCase() !== q.replace('$', '')) continue;
+    const b = document.createElement('button'); b.type = 'button'; b.dataset.id = e.id;
+    b.innerHTML = '<span class="t"></span><span class="w"></span>';
+    b.firstChild.textContent = (edits.has(e.id) ? '● ' : '') + (s || '(empty)'); if (edits.has(e.id)) b.firstChild.classList.add('ed');
+    b.lastChild.textContent = GROUP[e.g] + ' · ' + e.l[0] + (e.l.length > 1 ? ' (+' + (e.l.length - 1) + ')' : '');
+    b.setAttribute('aria-pressed', cur === e); b.onclick = () => select(e);
+    frag.appendChild(b); if (++n >= 600) break;
+  }
+  list.appendChild(frag);
+  $('count').textContent = n >= 600 ? 'First 600 matches; narrow the search to see more.' : n + ' text' + (n === 1 ? '' : 's');
+}
+$('q').oninput = fillList;
+document.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { group = b.dataset.g; document.querySelectorAll('[data-g]').forEach(x => x.setAttribute('aria-pressed', x === b)); fillList(); });
+
+// ------------------------------------------------------------ editor
+function select(e) {
+  if (!e) return; cur = e;
+  for (const b of $('list').children) b.setAttribute('aria-pressed', +b.dataset.id === e.id);
+  $('ttitle').textContent = GROUP[e.g]; $('tid').textContent = 'text $' + hex(e.id);
+  const u = $('uses'); u.textContent = '';
+  const head = document.createElement('div'); head.textContent = e.l.length > 1 ? 'Shown in ' + e.l.length + ' places. Changing it changes all of them:' : 'Shown in:'; u.appendChild(head);
+  e.l.slice(0, 40).forEach(x => { const d = document.createElement('div'); d.textContent = '· ' + x; u.appendChild(d); });
+  if (e.l.length > 40) { const d = document.createElement('div'); d.textContent = '· and ' + (e.l.length - 40) + ' more'; u.appendChild(d); }
+  $('ta').value = ST.fromCodes(codesOf(e));
+  fillWins(); refresh();
+}
+// windows a text is shown in (measured in the emulator; see build_msg_windows.js)
+function windowsOf(e) {
+  const out = [], seen = new Set();
+  const put = w => { const k = w.W + '/' + w.lines + '/' + (w.menu ? 1 : 0) + '/' + (w.indent || 0); if (seen.has(k)) return; seen.add(k); out.push(w); };
+  if (e.g === 'conv') put({ label: 'Conversation box', W: CONV_W, lines: CONV_LINES });
+  for (const i of e.msg || []) for (const [k, w, h, sid] of (META.msg_win || {})[i] || []) {
+    if (k === 'f') put({ label: 'Floating message ' + w + '×' + h + ' tiles (script $' + hex(sid, 3) + ')', W: (w - 2) * 8, lines: Math.max(1, h - 2) });
+    else if (k === 'c') put({ label: 'Conversation box (script $' + hex(sid, 3) + ')', W: CONV_W, lines: CONV_LINES });
+    else if (k === 'm') put({ label: 'Choice in a list menu (script $' + hex(sid, 3) + ')', W: MENU_W, lines: 1, menu: true });
+  }
+  if (e.g !== 'conv') for (const [w, h, col, row] of (META.eng_win || {})[hex(e.id)] || []) put({ label: 'Game window ' + w + '×' + h + ' tiles' + (col || row ? ', starting at column ' + col + ', line ' + (row + 1) : ''), W: (w - 2) * 8, lines: Math.max(1, h - 2 - row), indent: col * 8 });
+  out.sort((a, b) => a.W - b.W || a.lines - b.lines);
+  return out;
+}
+let wins = [], win = null;
+function fillWins() {
+  wins = windowsOf(cur); win = wins[0] || null; const s = $('pvwin'); s.textContent = ''; s.hidden = wins.length < 2;
+  wins.forEach((w, i) => { const o = document.createElement('option'); o.value = i; o.textContent = w.label; s.appendChild(o); });
+}
+$('pvwin').onchange = () => { win = wins[+$('pvwin').value]; refresh(); };
+const textWidth = codes => { let x = 0, b = false; for (const c of codes) { if (c === 124) { b = true; continue; } if (c === 32) b = false; x += width(c) + (b ? 1 : 0); } return x; };
+function check(codes) {
+  const bad = [...new Set(codes.filter(c => !T.canEncode(c)))];
+  return bad;
+}
+function refresh() {
+  if (!cur) return;
+  const codes = ST.toCodes($('ta').value), bad = check(codes);
+  const counts = $('counts'); counts.innerHTML = '';
+  const add = (label, val, cls) => { const s = document.createElement('span'); s.innerHTML = label + ' <b></b>'; s.lastChild.textContent = val; if (cls) s.lastChild.className = cls; counts.appendChild(s); };
+  add('Characters', codes.length + ' / ' + ST.MAXLEN, codes.length > ST.MAXLEN ? 'bad' : codes.length > 218 ? 'warnc' : '');
+  let enc = null; if (!bad.length && codes.length) { try { enc = T.encode(codes); } catch (x) {} }
+  if (enc) add('Stored size', enc.length + ' bytes (was ' + cur.bytes + ')', enc.length > cur.bytes ? 'warnc' : 'ok');
+  const lines = win ? (win.menu ? [codes] : wrap(codes, win.W, win.indent || 0)) : [];
+  const tooWide = win && win.menu && textWidth(codes) >= MENU_W, tooMany = win && !win.menu && lines.length > win.lines;
+  if (win && win.menu) add('Width in the menu', textWidth(codes) + ' / ' + (MENU_W - 1) + ' px', tooWide ? 'bad' : '');
+  else if (win) add('Lines in the window', lines.length + ' / ' + win.lines, tooMany ? 'bad' : lines.length === win.lines ? 'warnc' : '');
+  const w = $('warn'); const msgs = [];
+  if (bad.length) msgs.push('The game font has no ' + bad.map(c => c >= 32 && c < 127 ? '"' + String.fromCharCode(c) + '"' : '{' + c.toString(16).toUpperCase() + '}').join(', ') + '. Replace ' + (bad.length > 1 ? 'them' : 'it') + ' to save this text.');
+  if (codes.length > ST.MAXLEN) msgs.push('Texts are limited to ' + ST.MAXLEN + ' characters: longer ones would overwrite game memory.');
+  if (!codes.length) msgs.push('A text cannot be empty. Use a single space if you want it blank.');
+  if (tooMany) msgs.push('This will not fit in the ' + (win.lines === CONV_LINES && win.W === CONV_W ? 'conversation box' : 'window') + ' (' + lines.length + ' lines, room for ' + win.lines + ').' + (wins.length > 1 ? ' It is shown in more than one window; the preview uses the smallest.' : '') + (/^Floating/.test(win.label) ? ' Floating messages get their size from the script that shows them: widen or heighten the window there in the Script Editor: FLOATER(time, message, style, height, width, y, x), sizes in 8-pixel tiles including the border.' : ''));
+  if (tooWide) msgs.push('Menu entries must fit on one line, under ' + MENU_W + ' pixels; a longer one breaks the menu.');
+  if (enc && enc.length > cur.bytes) msgs.push('Longer than the original, so it will be moved to free space at export (this works, it just adds a small patch hook).');
+  w.hidden = !msgs.length; w.textContent = msgs.join(' '); w.className = 'msg ' + (bad.length || codes.length > ST.MAXLEN || !codes.length || tooMany || tooWide ? 'err' : '');
+  const valid = !bad.length && codes.length && codes.length <= ST.MAXLEN;
+  const same = codes.join() === cur.codes.join();
+  if (valid) { if (same) edits.delete(cur.id); else edits.set(cur.id, codes); }
+  $('revert').disabled = !edits.has(cur.id);
+  drawPreview(codes, lines);
+  const item = [...$('list').children].find(b => +b.dataset.id === cur.id);
+  if (item) { item.firstChild.textContent = (edits.has(cur.id) ? '● ' : '') + (plain(codes) || '(empty)'); item.firstChild.classList.toggle('ed', edits.has(cur.id)); }
+  $('export').disabled = !edits.size; $('saveproj').disabled = !edits.size;
+  autosave();
+}
+let refreshT = 0;
+$('ta').oninput = () => { clearTimeout(refreshT); refreshT = setTimeout(refresh, 60); };
+$('revert').onclick = () => { if (!cur) return; edits.delete(cur.id); $('ta').value = ST.fromCodes(cur.codes); refresh(); status('Back to the original text.'); };
+
+// ------------------------------------------------------------ font + preview (renderer $80FB03: wrap by pixel width)
+const width = c => ST.glyph(romU8, c).w;
+function wrap(codes, W, indent) {
+  const lines = []; let line = [], rem = W - (indent || 0), bold = false, i = 0;
+  while (i < codes.length) {
+    let j = i, w = 0, b = bold;
+    while (j < codes.length && codes[j] !== 32) { if (codes[j] === 124) { b = true; j++; continue; } w += width(codes[j]) + (b ? 1 : 0); j++; }
+    if (w === 0) w = 5;
+    if (w >= rem && (line.length || lines.length === 0 && indent)) { lines.push(line); line = []; rem = W; }
+    for (let k = i; k < j; k++) { if (codes[k] === 124) { bold = true; line.push(124); continue; } line.push(codes[k]); rem -= width(codes[k]) + (bold ? 1 : 0); }
+    i = j;
+    if (i < codes.length && codes[i] === 32) { bold = false; if (line.length) { line.push(32); rem -= width(32); } i++; }
+  }
+  if (line.length) lines.push(line);
+  return lines;
+}
+function drawGlyph(id, W, x, y, c, bold, color) {
+  // glyph rows are right-aligned: bit (w-1) is the leftmost pixel; bold = row | row << 1, one pixel wider
+  const g = ST.glyph(romU8, c), w = g.w + (bold ? 1 : 0);
+  for (let r = 0; r < 8; r++) {
+    let row = g.rows[r]; if (bold) row = row | (row << 1);
+    for (let k = 0; k < w; k++) if (row & (1 << (w - 1 - k))) { const px = x + k, py = y + r; if (px < 0 || px >= W || py < 0) continue; const o = (py * W + px) * 4; if (o + 3 >= id.data.length) continue; id.data[o] = color[0]; id.data[o + 1] = color[1]; id.data[o + 2] = color[2]; id.data[o + 3] = 255; }
+  }
+}
+function drawPreview(codes, lines) {
+  const known = !!win, W = known ? (win.menu ? Math.max(MENU_W, textWidth(codes) + 1) : win.W) : 236, maxL = known ? win.lines : 0;
+  const shown = known ? lines : wrap(codes, W), H = Math.max(known ? maxL : 1, shown.length) * 8;
+  const cv = $('pv'); cv.width = W; cv.height = H; const scale = 2; cv.style.width = W * scale + 'px'; cv.style.height = H * scale + 'px';
+  const g = cv.getContext('2d'), id = g.createImageData(W, H);
+  shown.forEach((ln, r) => {
+    let x = r === 0 && win ? (win.indent || 0) : 0, bold = false;
+    const over = known && r >= maxL;
+    for (const c of ln) {
+      if (c === 124) { bold = true; continue; }
+      if (c === 32) bold = false;
+      const red = over || (win && win.menu && x + width(c) > MENU_W - 1);
+      drawGlyph(id, W, x, r * 8, c, bold, red ? [255, 107, 94] : [248, 248, 248]); x += width(c) + (bold ? 1 : 0);
+    }
+  });
+  g.putImageData(id, 0, 0);
+  $('pvnote').textContent = !known ? 'The window for this text is drawn by the game engine (menus, status screens) and has not been measured: the preview uses a wide box.'
+    : win.menu ? 'One entry of a list menu: ' + (MENU_W - 1) + ' px at most. Anything past that is red.'
+    : win.label.replace(/ \(script.*$/, '') + ': ' + win.W + ' px wide' + (win.indent ? ' (this text starts ' + win.indent + ' px in)' : '') + ', ' + win.lines + ' line' + (win.lines === 1 ? '' : 's') + ' from where it starts. Lines that will not fit are red.';
+}
+function buildGlyphs() {
+  const box = $('glyphs'); box.textContent = '';
+  for (const c of SPECIAL) {
+    if (!T.canEncode(c)) continue;
+    const b = document.createElement('button'); b.type = 'button'; b.title = 'Insert {' + c.toString(16).toUpperCase().padStart(2, '0') + '}';
+    const gl = ST.glyph(romU8, c), blank = gl.rows.every(r => !r);
+    if (blank) { b.title += ': a blank ' + gl.w + ' px wide, used to line up menus'; b.innerHTML = '<span style="font-size:13px;color:var(--fg);height:24px;display:flex;align-items:center">␣' + gl.w + '</span><span>' + c.toString(16).toUpperCase().padStart(2, '0') + '</span>'; }
+    else { b.innerHTML = '<canvas width="8" height="8"></canvas><span>' + c.toString(16).toUpperCase().padStart(2, '0') + '</span>';
+      const g = b.firstChild.getContext('2d'), id = g.createImageData(8, 8); drawGlyph(id, 8, 0, 0, c, false, [248, 248, 248]); g.putImageData(id, 0, 0); }
+    b.onclick = () => { const ta = $('ta'), s = ta.selectionStart, t = '{' + c.toString(16).toUpperCase().padStart(2, '0') + '}'; ta.setRangeText(t, s, ta.selectionEnd, 'end'); ta.focus(); refresh(); };
+    box.appendChild(b);
+  }
+}
+
+// ------------------------------------------------------------ projects
+function projectJson() {
+  const texts = {}; for (const [id, codes] of edits) texts[hex(id)] = ST.fromCodes(codes);
+  return { tool: 'Shadowrun Text Editor', version: 1, base_crc32: fmtCrc(romCrc), base_name: romName, texts };
+}
+function autosave() { store.set('sr-text-edits-' + romCrc, JSON.stringify(projectJson())); }
+function applyProject(j, auto) {
+  let n = 0, skipped = 0;
+  for (const [k, s] of Object.entries(j.texts || {})) {
+    const id = parseInt(k, 16), e = byId.get(id); if (!e) { skipped++; continue; }
+    const codes = ST.toCodes(String(s)); if (check(codes).length || !codes.length || codes.length > ST.MAXLEN) { skipped++; continue; }
+    if (codes.join() !== e.codes.join()) { edits.set(id, codes); n++; }
+  }
+  fillList(); if (cur) select(cur);
+  $('export').disabled = !edits.size; $('saveproj').disabled = !edits.size;
+  const other = j.base_crc32 && j.base_crc32 !== fmtCrc(romCrc);
+  status((auto ? 'Picked up your unsaved edits from last time: ' : 'Loaded edits: ') + n + ' text' + (n === 1 ? '' : 's') + '.' + (skipped ? ' ' + skipped + ' could not be used on this ROM.' : '') + (other ? ' They were made on a different ROM; check them before exporting.' : ''), other || skipped ? 'err' : 'ok');
+}
+async function loadProject(file) { try { applyProject(JSON.parse(await file.text()), false); } catch (e) { status('Could not read that edits file: ' + e.message, 'err'); } }
+$('projfile').onchange = e => { if (e.target.files[0]) loadProject(e.target.files[0]); e.target.value = ''; };
+
+// ------------------------------------------------------------ files
+async function offer(filename, data) {
+  const dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
+  if (dl) {
+    try { await dl.save({ filename, data }); return true; }
+    catch (e) { if (e && e.code === 'declined') { status('Save cancelled.'); return false; } if (!['unavailable', 'not_granted', 'capability_disabled', 'capability_removed'].includes(e && e.code)) { status('Could not save: ' + (e && e.message || e), 'err'); return false; } }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data])); a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  return true;
+}
+function ipsDiff(oldU8, newU8) {
+  const out = [0x50, 0x41, 0x54, 0x43, 0x48], n = newU8.length, grew = n > oldU8.length, old = i => (i < oldU8.length ? oldU8[i] : 0);
+  let i = 0;
+  while (i < n) {
+    if (old(i) === newU8[i]) { i++; continue; }
+    let j = i; while (j < n && j - i < 0xFFFF && (old(j) !== newU8[j] || (j + 1 < n && old(j + 1) !== newU8[j + 1]))) j++;
+    let s = i; if (s === 0x454F46) s--;
+    out.push(s >> 16, (s >> 8) & 0xFF, s & 0xFF, ((j - s) >> 8) & 0xFF, (j - s) & 0xFF); for (let k = s; k < j; k++) out.push(newU8[k]); i = j;
+  }
+  if (grew) { const s = n - 1; out.push(s >> 16, (s >> 8) & 0xFF, s & 0xFF, 0, 1, newU8[n - 1]); }
+  out.push(0x45, 0x4F, 0x46); return Uint8Array.from(out);
+}
+function zip(files) {
+  const enc = new TextEncoder(), parts = [], central = []; let off = 0;
+  for (const f of files) {
+    const name = enc.encode(f.name), data = typeof f.data === 'string' ? enc.encode(f.data) : f.data, crc = crc32(data);
+    const h = new DataView(new ArrayBuffer(30)); h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(12, 0x5521, true);
+    h.setUint32(14, crc, true); h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, name.length, true);
+    parts.push(new Uint8Array(h.buffer), name, data);
+    const c = new DataView(new ArrayBuffer(46)); c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(14, 0x5521, true);
+    c.setUint32(16, crc, true); c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, name.length, true); c.setUint32(42, off, true);
+    central.push(new Uint8Array(c.buffer), name); off += 30 + name.length + data.length;
+  }
+  const csize = central.reduce((s, p) => s + p.length, 0), e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, csize, true); e.setUint32(16, off, true);
+  return new Blob([...parts, ...central, new Uint8Array(e.buffer)]);
+}
+$('saveproj').onclick = () => offer('shadowrun_text_edits.json', JSON.stringify(projectJson(), null, 1));
+$('export').onclick = async () => {
+  if (!edits.size) return;
+  status('Building the patch…'); await new Promise(r => setTimeout(r, 30));
+  let res; try { res = ST.applyTextEdits(romU8, inv, edits); } catch (e) { status('Could not build the patch: ' + e.message, 'err'); return; }
+  const ips = ipsDiff(romU8, res.rom), crcOut = fmtCrc(crc32(res.rom));
+  const moved = res.report.filter(r => r.where === 'moved').length;
+  const readme = ['Shadowrun Text Editor patch', '',
+    'Apply Shadowrun_TextEdits.ips to the ROM you edited:', '  ' + romName + '  (' + (romU8.length >> 20) + ' MB, CRC32 ' + fmtCrc(romCrc) + ')',
+    'Result: ' + (res.rom.length >> 20) + ' MB, CRC32 ' + crcOut, '',
+    edits.size + ' texts changed: ' + (edits.size - moved) + ' written in place, ' + moved + ' moved to free space (banks $B4-$B7, hook at $80FE44).', '',
+    ...res.report.map(r => 'text $' + hex(r.id) + ': ' + r.size + ' bytes, ' + (r.where === 'in place' ? 'in place' : 'moved to $' + hex(r.addr, 6))), '',
+    'The map editor patch uses different parts of the ROM, so both patches can be applied, in either order, to the same base ROM.',
+    'If you rebuild the base ROM, load it here, use "Load edits" with shadowrun_text_edits.json, and export again.'].join('\n');
+  const ok = await offer('Shadowrun_TextEdits.zip', zip([{ name: 'Shadowrun_TextEdits.ips', data: ips }, { name: 'shadowrun_text_edits.json', data: JSON.stringify(projectJson(), null, 1) }, { name: 'README.txt', data: readme }]));
+  if (ok) status('Patch ready: ' + edits.size + ' texts, IPS ' + ips.length + ' bytes. Patched ROM CRC32 ' + crcOut + '.', 'ok');
+};
+})();
+</script>
+
+</html>

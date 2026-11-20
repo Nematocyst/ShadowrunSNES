@@ -1,0 +1,208 @@
+<title>Shadowrun Script Atlas</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: two-pane reader. Narrow index rail on the left, script listing on the right; stacks on phones. */
+:root {
+  --bg: #eef1f4; --panel: #ffffff; --ink: #18212b; --muted: #5b6875; --line: #d3dae1;
+  --accent: #b4235a; --accent-soft: #f6dde7; --code: #1c2733; --note: #52705a; --hit: #fff1b8;
+  --display: "Chakra Petch", "Segoe UI", sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", Roboto, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #11161c; --panel: #171e26; --ink: #dfe6ee; --muted: #8d9aa8; --line: #2a3440;
+  --accent: #ff6f9f; --accent-soft: #3a1f2b; --code: #d4dde6; --note: #8fbf98; --hit: #4a3f12; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #11161c; --panel: #171e26; --ink: #dfe6ee; --muted: #8d9aa8; --line: #2a3440;
+  --accent: #ff6f9f; --accent-soft: #3a1f2b; --code: #d4dde6; --note: #8fbf98; --hit: #4a3f12; color-scheme: dark }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 14px; }
+.wrap { height: 100%; display: flex; flex-direction: column; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 12px; gap: 10px; box-sizing: border-box; }
+header { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+h1 { font-family: var(--display); font-weight: 600; font-size: 22px; margin: 0; letter-spacing: .02em; text-wrap: balance; }
+h1 span { color: var(--accent); }
+.sub { color: var(--muted); font-size: 13px; }
+nav { display: flex; gap: 4px; margin-left: auto; }
+nav button { font: 500 13px var(--body); border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+nav button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(240px, 320px) 1fr; gap: 10px; }
+.rail, .view { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
+.tools { padding: 10px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
+.tools input[type=search] { font: 14px var(--body); padding: 7px 9px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--ink); width: 100%; box-sizing: border-box; }
+.tools label { font-size: 12px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+.tools select { font: 12px var(--body); background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; padding: 3px; }
+.count { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+ul { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
+li a { display: grid; grid-template-columns: 3.4em 1fr; gap: 8px; padding: 5px 10px; text-decoration: none; color: var(--ink); border-bottom: 1px solid var(--line); font-size: 13px; }
+li a .id { font-family: var(--mono); color: var(--accent); font-variant-numeric: tabular-nums; }
+li a .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+li a .t.none { color: var(--muted); font-style: italic; }
+li a:hover { background: var(--bg); }
+li a[aria-current="true"] { background: var(--accent-soft); }
+.view-head { padding: 10px 14px; border-bottom: 1px solid var(--line); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.view-head h2 { font-family: var(--display); font-weight: 500; font-size: 17px; margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.view-head button { font: 12px var(--body); background: none; border: 1px solid var(--line); color: var(--muted); border-radius: 4px; padding: 4px 8px; cursor: pointer; }
+.view-head .back { margin-left: auto; }
+pre { margin: 0; padding: 12px 14px; overflow: auto; flex: 1; font: 12.5px/1.55 var(--mono); color: var(--code); tab-size: 4; }
+pre a { color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--accent); }
+pre a:hover { border-bottom-style: solid; }
+pre .c { color: var(--note); }
+pre .h { color: var(--muted); }
+pre .sec { color: var(--accent); font-weight: 500; }
+pre mark { background: var(--hit); color: inherit; }
+.about { padding: 14px 18px; overflow: auto; line-height: 1.6; max-width: 70ch; }
+.about h3 { font-family: var(--display); font-weight: 500; margin: 1.2em 0 .3em; font-size: 16px; }
+.about code { font-family: var(--mono); font-size: 12.5px; background: var(--bg); padding: 1px 4px; border-radius: 3px; }
+@media (max-width: 760px) {
+  main { grid-template-columns: 1fr; grid-template-rows: 40% 1fr; }
+  nav { margin-left: 0; }
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Shadowrun <span>Script Atlas</span></h1>
+    <span class="sub">SNES (USA) · 936 scripts · decoded from the clean ROM</span>
+    <nav aria-label="Views">
+      <button id="tab-s" aria-pressed="true">Scripts</button>
+      <button id="tab-l" aria-pressed="false">Locations</button>
+      <button id="tab-a" aria-pressed="false">How to read</button>
+    </nav>
+  </header>
+  <main>
+    <section class="rail">
+      <div class="tools">
+        <input id="q" type="search" placeholder="Search id, label or text (e.g. 1E4, Glutman, WARP)" aria-label="Search scripts">
+        <label><input id="deep" type="checkbox" checked> Search inside the code and dialogue</label>
+        <label>Show <select id="kind"><option value="all">all scripts</option><option value="named">labelled only</option><option value="orphan">no reference found</option></select></label>
+        <span class="count" id="count"></span>
+      </div>
+      <ul id="list"></ul>
+    </section>
+    <section class="view">
+      <div class="view-head"><h2 id="vt"></h2><button id="copy">Copy text</button><button class="back" id="back" hidden>Back</button></div>
+      <pre id="out"></pre>
+      <div class="about" id="about" hidden></div>
+    </section>
+  </main>
+</div>
+
+<script type="application/json" id="data">/*DATA*/null</script>
+<script>
+const DATA = JSON.parse(document.getElementById('data').textContent);
+const S = DATA.scripts, LOCS = DATA.locs;
+const locBlock = {};
+LOCS.forEach((b, k) => { const m = b.match(/^Locations ([^\n]*?)\s+map data/); if (m) m[1].split(', ').forEach(x => locBlock[x.slice(1)] = k); });
+const $ = id => document.getElementById(id);
+let mode = 's', cur = null, hist = [];
+const esc = s => s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const hex3 = n => n.toString(16).toUpperCase().padStart(3, '0');
+
+function linkLine(line) {
+  let h = esc(line);
+  const isLoc = /^(Warps to|  - object type|  - floor zone|Locations |  exit )/.test(line) || /to location \$/.test(line);
+  h = h.replace(/script_([0-9A-F]{3})\(/g, (m, x) => `<a href="#s${x}" data-s="${x}">script_${x}</a>(`);
+  h = h.replace(/(script )\$([0-9A-F]{3})\b/g, (m, a, x) => `${a}<a href="#s${x}" data-s="${x}">$${x}</a>`);
+  if (isLoc) h = h.replace(/(^|[ (,])\$([0-9A-F]{3})\b(?![0-9A-F])/g, (m, a, x) => locBlock[x] !== undefined ? `${a}<a href="#l${x}" data-l="${x}">$${x}</a>` : m);
+  else if (/script/.test(line)) h = h.replace(/(, |by script )\$([0-9A-F]{3})\b/g, (m, a, x) => parseInt(x, 16) < S.length ? `${a}<a href="#s${x}" data-s="${x}">$${x}</a>` : m);
+  if (/^\s+; /.test(line)) h = `<span class="c">${h}</span>`;
+  else if (/^-- .* --$/.test(line)) h = `<span class="sec">${h}</span>`;
+  else if (/^(=+|Script |SNES )/.test(line)) h = `<span class="h">${h}</span>`;
+  return h;
+}
+function highlight(html, q) {
+  if (!q || q.length < 2) return html;
+  const re = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+  return html.split(/(<[^>]+>)/).map(p => p.startsWith('<') ? p : p.replace(re, '<mark>$1</mark>')).join('');
+}
+function renderList() {
+  const q = $('q').value.trim().toLowerCase(), deep = $('deep').checked, kind = $('kind').value;
+  const ul = $('list'); ul.textContent = '';
+  if (mode === 'l') {
+    let n = 0;
+    LOCS.forEach((b, k) => {
+      if (q && !(deep ? b : b.split('\n')[0]).toLowerCase().includes(q)) return;
+      const first = b.split('\n')[0].replace(/^Locations /, '').replace(/\s+map data.*/, '');
+      const li = document.createElement('li');
+      li.innerHTML = `<a href="#l${first.slice(1,4)}" data-l="${first.slice(1,4)}"><span class="id">${first.slice(0,4)}</span><span class="t">${esc(first)}</span></a>`;
+      ul.appendChild(li); n++;
+    });
+    $('count').textContent = n + ' maps';
+    return;
+  }
+  let n = 0; const frag = document.createDocumentFragment();
+  for (const s of S) {
+    if (kind === 'named' && !s.t) continue;
+    if (kind === 'orphan' && s.u) continue;
+    if (q) {
+      const idm = hex3(s.i).toLowerCase() === q.replace('$', '') || String(s.i) === q;
+      if (!idm && !s.t.toLowerCase().includes(q) && !(deep && s.x.toLowerCase().includes(q))) continue;
+    }
+    const li = document.createElement('li');
+    li.innerHTML = `<a href="#s${hex3(s.i)}" data-s="${hex3(s.i)}" ${cur === 's' + s.i ? 'aria-current="true"' : ''}><span class="id">$${hex3(s.i)}</span><span class="t${s.t ? '' : ' none'}">${esc(s.t || 'unlabelled')}</span></a>`;
+    frag.appendChild(li); n++;
+  }
+  ul.appendChild(frag);
+  $('count').textContent = n + ' of ' + S.length + ' scripts';
+}
+function show(kind, key, push = true) {
+  if (push && cur) hist.push(cur);
+  $('back').hidden = !hist.length;
+  $('about').hidden = true; $('out').hidden = false;
+  const q = $('q').value.trim();
+  if (kind === 's') {
+    const s = S[parseInt(key, 16)]; if (!s) return;
+    cur = 's' + s.i;
+    $('vt').textContent = `Script $${hex3(s.i)}` + (s.t ? ` · ${s.t}` : '');
+    $('out').innerHTML = highlight(s.x.split('\n').map(linkLine).join('\n'), q);
+  } else {
+    const k = locBlock[key]; if (k === undefined) return;
+    cur = 'l' + key;
+    $('vt').textContent = `Location $${key}`;
+    $('out').innerHTML = highlight(LOCS[k].split('\n').map(linkLine).join('\n'), q);
+  }
+  $('out').scrollTop = 0;
+  document.querySelectorAll('#list a[aria-current]').forEach(a => a.removeAttribute('aria-current'));
+  const a = document.querySelector(`#list a[data-${kind}="${key}"]`); if (a) a.setAttribute('aria-current', 'true');
+}
+function showAbout() {
+  $('out').hidden = true; $('about').hidden = false; $('vt').textContent = 'How to read the listings';
+  $('about').innerHTML = `<p>Every script in the game, decoded from its bytecode into pseudo-code, with the raw bytes underneath. Each one starts with <b>Used by</b>: the object types that run it and the locations they are placed in, conversation topics that trigger it, floor zones, and the scripts that call it.</p>
+  <h3>Reading the pseudo-code</h3><p>Function calls like <code>WARP(44)</code> are the engine's built-in commands. Their arguments are listed in the order the script pushes them; the last one is usually the object. All 219 commands have names, read from their 65816 routines. Names ending in <code>?</code> are educated guesses from what the routine touches rather than confirmed in play.</p>
+  <p><code>self</code> is the object the script belongs to. <code>L.b3</code> / <code>L.w3</code> are the script's local variables (byte / word), and <code>var[n]</code> is a story variable such as <code>var[44]</code>, which drives the ending. Text the script shows is decoded on the following comment line.</p>
+  <h3>Names and gaps</h3><p>Object names are the labels the game shows when you point at something ("Arena owner", "Shady character..."). Invisible helper objects have no label. 68 scripts have no reference found. They may be started by engine code or be leftovers, such as a debug warp to the "Winter CES'93" demo.</p>
+  <pre class="h" style="padding:0;white-space:pre-wrap">${esc(DATA.about)}</pre>`;
+}
+function setMode(m) {
+  mode = m;
+  $('tab-s').setAttribute('aria-pressed', m === 's'); $('tab-l').setAttribute('aria-pressed', m === 'l'); $('tab-a').setAttribute('aria-pressed', m === 'a');
+  $('kind').parentElement.hidden = m !== 's';
+  if (m === 'a') { showAbout(); return; }
+  $('q').placeholder = m === 'l' ? 'Search location id or contents' : 'Search id, label or text (e.g. 1E4, Glutman, WARP)';
+  renderList();
+}
+document.addEventListener('click', e => {
+  const a = e.target.closest('a[data-s], a[data-l]'); if (!a) return;
+  e.preventDefault();
+  if (a.dataset.s) { if (mode !== 's') setMode('s'); show('s', a.dataset.s); }
+  else { if (mode !== 'l') setMode('l'); show('l', a.dataset.l); }
+});
+$('back').onclick = () => { const h = hist.pop(); if (!h) return; const k = h[0]; if (mode !== k) setMode(k); show(k, k === 's' ? hex3(+h.slice(1)) : h.slice(1), false); };
+$('tab-s').onclick = () => setMode('s'); $('tab-l').onclick = () => setMode('l'); $('tab-a').onclick = () => setMode('a');
+let tm; $('q').oninput = () => { clearTimeout(tm); tm = setTimeout(renderList, 120); };
+$('deep').onchange = renderList; $('kind').onchange = renderList;
+$('copy').onclick = async () => {
+  const t = $('out').hidden ? $('about').innerText : $('out').innerText;
+  try { await navigator.clipboard.writeText(t); $('copy').textContent = 'Copied'; }
+  catch { const r = document.createRange(); r.selectNodeContents($('out')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); $('copy').textContent = 'Selected'; }
+  setTimeout(() => $('copy').textContent = 'Copy text', 1500);
+};
+setMode('s');
+const h = location.hash.slice(1);
+if (/^s[0-9A-F]{3}$/.test(h)) show('s', h.slice(1), false);
+else if (/^l[0-9A-F]{3}$/.test(h)) { setMode('l'); show('l', h.slice(1), false); }
+else show('s', '1E4', false);
+</script>

@@ -1,0 +1,1203 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shadowrun Script Editor</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a workbench. Map canvas fills the left, a fixed-width inspector + block catalogue on the right; stacks on phones.
+   Single dark look on purpose: map art is judged against black, like the game itself. */
+:root {
+  --bg: #0d0f14; --panel: #151922; --panel-2: #1c2130; --line: #2a3142; --fg: #e4e7ef; --muted: #8d95a8;
+  --accent: #ff4f9a; --accent-ink: #1a0610; --cyan: #3fd6e8; --green: #59e08a; --yellow: #f2c94c; --red: #ff6b5e;
+  --display: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--fg); font: 14px/1.45 var(--body); }
+.wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 14px 24px; display: flex; flex-direction: column; gap: 12px; min-height: 100%; box-sizing: border-box; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+h1 { font: 600 22px/1 var(--display); letter-spacing: .02em; margin: 0; }
+h1 span { color: var(--accent); }
+h2 { font: 600 13px/1.2 var(--display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.grow { flex: 1 1 auto; }
+button, .btn, select, input { font: inherit; color: var(--fg); }
+button, .btn { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 6px 11px; cursor: pointer; white-space: nowrap; }
+button:hover:not(:disabled), .btn:hover { border-color: var(--muted); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+button:focus-visible, input:focus-visible, select:focus-visible, .btn:focus-within { outline: 2px solid var(--cyan); outline-offset: 2px; }
+input[type="number"], input[type="search"], select { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; min-width: 0; }
+input[type="number"] { width: 5.5em; font-family: var(--mono); }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.toolbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 4px; }
+main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 12px; flex: 1 1 auto; min-height: 0; }
+@media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); } }
+.stage { background: #000; border: 1px solid var(--line); border-radius: 8px; overflow: auto; position: relative; min-height: 320px; max-height: calc(100vh - 170px); }
+.stage canvas { display: block; image-rendering: pixelated; }
+#over { position: absolute; left: 0; top: 0; }
+aside { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.field { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
+.meters { display: grid; grid-template-columns: auto 1fr auto; gap: 6px 10px; align-items: center; font-size: 12px; }
+.bar { height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--cyan); }
+.bar.warn i { background: var(--yellow); } .bar.over i { background: var(--red); }
+.cat { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; max-height: 420px; overflow-y: auto; padding-right: 2px; }
+.blk { background: #000; border: 1px solid var(--line); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; gap: 2px; align-items: stretch; cursor: pointer; text-align: left; }
+.blk canvas { width: 100%; aspect-ratio: 4 / 3; image-rendering: pixelated; }
+.blk span { font: 11px var(--mono); color: var(--muted); }
+.blk.used span { color: var(--accent); }
+.drop { border: 2px dashed var(--line); border-radius: 10px; padding: 20px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 24px; align-items: center; }
+@media (max-width: 760px) { .drop { grid-template-columns: minmax(0, 1fr); } }
+.drop.hot { border-color: var(--accent); }
+.drop img { width: 100%; border-radius: 6px; border: 1px solid var(--line); image-rendering: pixelated; }
+.drop ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; max-width: 60ch; }
+.drop p { margin: 0; max-width: 62ch; }
+.badge { font: 500 11px var(--mono); padding: 2px 6px; border-radius: 4px; background: var(--panel-2); border: 1px solid var(--line); }
+.badge.edit { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.msg { font-size: 13px; padding: 8px 10px; border-radius: 6px; background: var(--panel-2); border-left: 3px solid var(--cyan); }
+.msg.err { border-left-color: var(--red); } .msg.ok { border-left-color: var(--green); }
+.keys { font-size: 12px; color: var(--muted); display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; }
+kbd { font: 11px var(--mono); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; color: var(--fg); }
+#mapsel { max-width: 340px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+@media (prefers-reduced-motion: no-preference) { .bar i { transition: width .2s; } }
+
+.modes { display: flex; gap: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.modes button { border: 0; border-radius: 0; border-right: 1px solid var(--line); padding: 7px 14px; font-family: var(--display); font-weight: 600; letter-spacing: .03em; }
+.modes button:last-child { border-right: 0; }
+.modes button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.pal { display: grid; grid-template-columns: repeat(auto-fill, minmax(66px, 1fr)); gap: 4px; max-height: 360px; overflow-y: auto; }
+.pal button { padding: 3px; background: #000; display: flex; flex-direction: column; align-items: center; gap: 2px; font: 10px var(--mono); color: var(--muted); }
+.pal button canvas { width: 64px; height: 32px; image-rendering: pixelated; }
+.pal button[aria-pressed="true"] { outline: 2px solid var(--accent); background: #000; color: var(--accent); }
+.list { display: flex; flex-direction: column; gap: 2px; max-height: 300px; overflow-y: auto; }
+.list button { text-align: left; display: flex; gap: 8px; align-items: baseline; padding: 4px 8px; background: transparent; border-color: transparent; }
+.list button[aria-pressed="true"] { background: var(--panel-2); color: var(--fg); border-color: var(--accent); }
+.list button .mono { color: var(--muted); font-size: 12px; }
+.list button.off { opacity: .5; text-decoration: line-through; }
+.grid6 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.grid6 input { width: 100%; box-sizing: border-box; }
+select.wide { width: 100%; }
+
+.cmain { display: grid; grid-template-columns: minmax(250px, 320px) minmax(0, 1fr) minmax(240px, 300px); gap: 12px; flex: 1 1 auto; min-height: 0; }
+@media (max-width: 1150px) { .cmain { grid-template-columns: minmax(240px, 300px) minmax(0, 1fr); } .cref { grid-column: 1 / -1; } }
+@media (max-width: 760px) { .cmain { grid-template-columns: minmax(0, 1fr); } }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chips button { padding: 4px 9px; font-size: 12px; border-radius: 999px; }
+.chips button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.clist { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; max-height: calc(100vh - 250px); min-height: 300px; }
+.clist button { text-align: left; display: flex; flex-direction: column; gap: 1px; padding: 5px 8px; background: transparent; border-color: transparent; white-space: normal; }
+.clist button:hover { background: var(--panel-2); }
+.clist button[aria-pressed="true"] { background: var(--panel-2); border-color: var(--accent); color: var(--fg); }
+.clist .t { font-size: 13px; } .clist .w { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.clist .ed { color: var(--accent); font-weight: 600; } .clist .pk { color: var(--yellow); }
+.code { display: grid; grid-template-columns: auto minmax(0, 1fr); border: 1px solid var(--line); border-radius: 6px; background: var(--bg); overflow: hidden; }
+.code pre { margin: 0; padding: 8px 6px; font: 13px/1.5 var(--mono); color: var(--muted); text-align: right; user-select: none; background: var(--panel); border-right: 1px solid var(--line); overflow: hidden; }
+.code textarea { border: 0; border-radius: 0; min-height: 420px; height: calc(100vh - 360px); font: 13px/1.5 var(--mono); padding: 8px 10px; white-space: pre; overflow: auto; resize: vertical; tab-size: 4; background: var(--bg); color: var(--fg); width: 100%; box-sizing: border-box; }
+.code textarea:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px; }
+.cstat { font-size: 13px; padding: 8px 10px; border-radius: 6px; background: var(--panel-2); border-left: 3px solid var(--green); font-family: var(--mono); }
+.cstat.err { border-left-color: var(--red); color: var(--fg); } .cstat.warn { border-left-color: var(--yellow); }
+.ref { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 6px; }
+.ref code, .ref kbd { font: 12px var(--mono); color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+.ref pre { margin: 0; font: 12px/1.45 var(--mono); color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px; overflow-x: auto; }
+.cmds { max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; }
+.cmds button { text-align: left; padding: 3px 6px; background: transparent; border-color: transparent; font: 12px var(--mono); display: flex; justify-content: space-between; gap: 8px; }
+.cmds button:hover { background: var(--panel-2); }
+.cmds button span { color: var(--muted); }
+.uses { font-size: 12px; color: var(--muted); }
+</style>
+
+<div class="wrap">
+<header>
+  <h1>Shadowrun <span>Script Editor</span></h1>
+  <span class="muted" id="romname">No ROM loaded</span>
+  <span class="grow"></span>
+  <label class="btn" for="romfile">Open ROM…</label>
+  <input type="file" id="romfile" accept=".sfc,.smc,.bin" class="visually-hidden">
+  <label class="btn" for="projfile" id="projlabel" hidden>Load edits…</label>
+  <input type="file" id="projfile" accept=".json" class="visually-hidden">
+  <button id="saveproj" disabled>Save edits</button>
+  <button id="export" class="primary" disabled>Export patch</button>
+</header>
+
+<section id="welcome" class="drop" aria-label="Open a ROM">
+  <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+    <h2>Change what happens in the game</h2>
+    <p>Everything that happens in Shadowrun, from a door opening to a boss fight, is one of 936 small scripts. This editor turns each script into readable code, lets you change it, adds brand-new scripts, compiles it all back and writes an IPS patch. Decompiling and recompiling every original script gives the same game, frame for frame.</p>
+    <ol>
+      <li>Open your Shadowrun (USA) ROM. Vanilla and Runner Pack ROMs both work. It stays in your browser.</li>
+      <li>Find a script by name, by who uses it (Hitman, Glutman's door…) or by its number from the Script Atlas.</li>
+      <li>Edit the code. It recompiles as you type and points at the line if something is wrong.</li>
+      <li>Need something the game doesn't have? "+ New script" makes one (numbered from $400) that any other script can run.</li>
+      <li>Export: you get a .zip with the .ips patch for that ROM.</li>
+    </ol>
+  </div>
+  <div style="min-width:0">
+    <div class="ref"><pre>script $060 args 1 returns no
+    self = arg1
+    ADD_NUYEN(1234)        ; new line: +1,234 nuyen
+    SET_VAR(0, 42)
+    REMOVE_SELF(self)
+    end</pre>
+    <span>The script that runs when you enter Jake's street, with one added line. In the game, Jake's money goes up by exactly 1,234.</span></div>
+  </div>
+</section>
+
+<div id="app" hidden style="display:flex;flex-direction:column;gap:12px;flex:1 1 auto;min-height:0">
+  <div class="cmain">
+    <div class="card" style="min-height:0">
+      <input type="search" id="q" placeholder="Search: Hitman, door, $060, WARP…" aria-label="Search scripts">
+      <div class="chips" role="group" aria-label="Filter"><button data-f="all" aria-pressed="true">All</button><button data-f="named" aria-pressed="false">Named</button><button data-f="edited" aria-pressed="false">Edited</button><button data-f="new" aria-pressed="false">New</button></div>
+      <button id="newscr" type="button">+ New script</button>
+      <label class="row muted small" style="font-size:12px;gap:6px"><input type="checkbox" id="incode"> also search inside the code</label>
+      <div class="muted" id="count" style="font-size:12px"></div>
+      <div class="clist" id="list"></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+      <div class="card">
+        <div class="row"><h2 class="grow" id="ctitle">Script</h2><span class="badge mono" id="cid"></span></div>
+        <div class="uses" id="uses"></div>
+        <div id="packwarn" class="msg err" hidden></div>
+        <div class="code"><pre id="gutter" aria-hidden="true">1</pre><textarea id="src" spellcheck="false" aria-label="Script code" wrap="off"></textarea></div>
+        <div id="cstat" class="cstat" aria-live="polite">Ready.</div>
+        <div class="row"><button id="revert" disabled>Revert to original</button><button id="delscr" hidden>Delete this new script</button><span class="muted" style="font-size:12px">Comments after <kbd>;</kbd> are notes only. Edits are kept in this browser until you export.</span></div>
+      </div>
+    </div>
+    <div class="card cref">
+      <h2>How the code reads</h2>
+      <div class="ref">
+        <span><code>self</code> the object running the script; <code>L.w1</code> <code>L.b5</code> its local word and byte slots (<code>L.sb5</code> reads a byte as signed); <code>var[42]</code> the game's story variables; <code>gb[$xxxx]</code> <code>gw[$xxxx]</code> any byte or word in RAM bank $7E.</span>
+        <span>Numbers: <code>200</code>, <code>-3</code>, <code>$02BD</code> (hex). Maths and tests: <code>+ - * / % &lt;&lt; &gt;&gt; &amp; | ^ ~</code>, <code>== != &lt; &lt;= &gt; &gt;=</code> (true is -1, false 0), <code>bool(x)</code>, <code>inc(x)</code>, <code>dec(x)</code>, <code>neg(x)</code>.</span>
+        <pre>if GET_PROGRESS() == 3 {
+    TEXT_BOX(12)
+} else {
+    WAIT(30, 1)
+}
+while L.w1 &lt; 5 {
+    L.w1 = L.w1 + 1
+}
+goto L_0040        ; jump to a label
+L_0040:            ; a label</pre>
+        <span>A script starts with its arguments waiting: take them first (<code>self = arg1</code>). <code>end</code> finishes it, <code>end x</code> also gives back a value. <code>script_22F(self)</code> runs another script. <code>push</code>, <code>pop()</code>, <code>dup(...)</code>, <code>drop</code> and <code>gosub</code> appear where the original code juggles values in ways plain code can't show; leave them as they are.</span>
+      </div>
+      <h2>Commands</h2>
+      <input type="search" id="cq" placeholder="Find a command: WARP, TEXT…" aria-label="Find a command">
+      <div class="cmds" id="cmds"></div>
+      <div class="muted" style="font-size:12px">Click a command to insert it. The number is how many values it takes; → means it gives one back. The <b>last</b> value is usually the object it acts on.</div>
+    </div>
+  </div>
+  <div id="status" class="msg" aria-live="polite">Ready.</div>
+</div>
+</div>
+
+<script>// Shadowrun (SNES) text core: Huffman decode/encode with the game's own tree, text inventory, font preview,
+// and writing edited texts back (in place when they fit, otherwise into a pool with a redirect hook).
+// Format: text id < $C000 -> bytes at $9D:(id|$8000) (bank $9E when id bit 15 is set); bit stream MSB first.
+// Tree at $9D:8000: node = two words (bit 0 / bit 1); word bit 15 set = leaf with 1-2 chars (high byte first,
+// $00 = none); $0A ends the text. Decoder $80FE33/$80FE44 -> buffer $7E21A0 -> renderer $80FB03 (wraps by pixel
+// width, font $95:F2D0 8 bytes/char, widths $81:ABC8, '|' = emphasised word until the next space).
+// Expanded Dialogue: ids >= $C000 -> 3-byte pointers at $A0:8100 + 3*(id-$C000) (hook JML $A08000 at $80FE33).
+// Our hook: JML $B48000 at $80FE44 (the shared entry): looks the 24-bit pointer up in a table at $B4:8100
+// (word: end offset = 6*count, then [old ptr 3][new ptr 3] entries) and swaps it. Relocated texts live at $B5:8000+.
+(function (root) {
+'use strict';
+const L = a => ((a & 0x7F0000) >> 1) | (a & 0x7FFF);
+const MAXLEN = 250;           // decoded characters; vanilla max is 218, the buffer at $7E21A0 must not reach $7E2300
+const HOOK = 0xB48000, TABLE = 0xB48100, POOL_FIRST = 0xB5, POOL_LAST = 0xB7;
+
+function rb(u8, a) { return u8[L(a)]; }
+function rw(u8, a) { return u8[L(a)] | (u8[L(a + 1)] << 8); }
+
+class Texts {
+  constructor(u8) {
+    this.u8 = u8; this.leaves = []; this.codes = new Map();   // key "c1,c2" -> bit string
+    const walk = (x, code) => {
+      for (const b of [0, 1]) {
+        const w = rw(u8, 0x9D8000 + x + 2 * b);
+        if (w & 0x8000) { const c1 = (w >> 8) & 0x7F, c2 = w & 0x7F; this.leaves.push([c1, c2, code + b]); this.codes.set(c1 + ',' + c2, code + b); }
+        else walk(w, code + b);
+      }
+    };
+    walk(0, '');
+    this.single = new Set(this.leaves.filter(l => l[1] === 0).map(l => l[0]));
+    this.ed = rb(u8, 0x80FE33) === 0x5C && rw(u8, 0x80FE34) === 0x8000 && rb(u8, 0x80FE36) === 0xA0;
+    this.hooked = rb(u8, 0x80FE44) === 0x5C && rw(u8, 0x80FE45) === (HOOK & 0xFFFF) && rb(u8, 0x80FE47) === (HOOK >> 16);
+    this.redirects = new Map();   // original ptr -> pool ptr
+    if (this.hooked && u8.length >= 0x200000) {
+      const end = rw(u8, TABLE);
+      for (let o = 0; o < end && o < 0x7E00; o += 6) {
+        const a = rw(u8, TABLE + 2 + o) | (rb(u8, TABLE + 4 + o) << 16), b = rw(u8, TABLE + 5 + o) | (rb(u8, TABLE + 7 + o) << 16);
+        this.redirects.set(a, b);
+      }
+    }
+  }
+  basePtr(id) {
+    if (id >= 0xC000) { if (!this.ed) return null; const t = 0xA08100 + 3 * (id - 0xC000); return rw(this.u8, t) | (rb(this.u8, t + 2) << 16); }
+    return ((0x9D + (id & 0x8000 ? 1 : 0)) << 16) | (id | 0x8000);
+  }
+  ptr(id) { const b = this.basePtr(id); return b == null ? null : (this.redirects.get(b) || b); }
+  // decode at a 24-bit pointer -> {codes: [char codes], bytes: length in bytes}
+  decodeAt(p) {
+    const u8 = this.u8, out = []; let bit = 0;
+    const base = L(p);
+    for (let guard = 0; guard < 4000; guard++) {
+      let x = 0, w;
+      for (;;) {
+        if ((u8[base + (bit >> 3)] >> (7 - (bit & 7))) & 1) x += 2;
+        bit++; w = u8[0xE8000 + x] | (u8[0xE8001 + x] << 8);
+        if (w & 0x8000) break; x = w;
+        if (x > 0x2000) return null;
+      }
+      const c1 = (w >> 8) & 0x7F, c2 = w & 0x7F;
+      if (c1 === 0x0A) return { codes: out, bytes: (bit + 7) >> 3 };
+      out.push(c1);
+      if (c2) { if (c2 === 0x0A) return { codes: out, bytes: (bit + 7) >> 3 }; out.push(c2); }
+    }
+    return null;
+  }
+  decode(id) { const p = this.ptr(id); return p == null ? null : this.decodeAt(p); }
+  // optimal encoding with the fixed tree (1- and 2-char leaves), ending with a leaf that holds $0A
+  encode(codes) {
+    const n = codes.length, INF = 1e9, best = new Array(n + 1).fill(INF), from = new Array(n + 1);
+    best[0] = 0;
+    for (let i = 0; i < n; i++) {
+      if (best[i] >= INF) continue;
+      const one = this.codes.get(codes[i] + ',0');
+      if (one && best[i] + one.length < best[i + 1]) { best[i + 1] = best[i] + one.length; from[i + 1] = [i, one]; }
+      if (i + 1 < n) { const two = this.codes.get(codes[i] + ',' + codes[i + 1]); if (two && best[i] + two.length < best[i + 2]) { best[i + 2] = best[i] + two.length; from[i + 2] = [i, two]; } }
+    }
+    // terminator: (0A,0) after everything, or (c,0A) covering the last char
+    let endBits = null, endBest = INF;
+    const t1 = this.codes.get('10,0');
+    if (t1 && best[n] < INF) { endBest = best[n] + t1.length; endBits = { at: n, code: t1 }; }
+    if (n > 0 && best[n - 1] < INF) { const t2 = this.codes.get(codes[n - 1] + ',10'); if (t2 && best[n - 1] + t2.length < endBest) { endBest = best[n - 1] + t2.length; endBits = { at: n - 1, code: t2 }; } }
+    if (!endBits) throw new Error('cannot encode');
+    const parts = [endBits.code]; let i = endBits.at;
+    while (i > 0) { if (!from[i]) throw new Error('character not in the game font: ' + codes[i - 1]); parts.push(from[i][1]); i = from[i][0]; }
+    const bits = parts.reverse().join('');
+    const out = new Uint8Array((bits.length + 7) >> 3);
+    for (let k = 0; k < bits.length; k++) if (bits[k] === '1') out[k >> 3] |= 0x80 >> (k & 7);
+    return out;
+  }
+  canEncode(code) { return this.single.has(code); }
+  // ---- inventory: every text the game points at, with where it is used
+  inventory(meta) {
+    const u8 = this.u8, list = new Map();
+    const add = (id, g, label) => { if (!id || id === 0xFFFF) return; if (id >= 0xC000 && !this.ed) return;
+      let e = list.get(id); if (!e) { e = { id, g, l: [] }; list.set(id, e); } if (!e.l.includes(label)) e.l.push(label);
+      const order = ['conv', 'msg', 'menu', 'kw', 'name', 'other']; if (order.indexOf(g) < order.indexOf(e.g)) e.g = g; };
+    const kwName = k => { const d = this.decode(rw(u8, 0x8D8000 + 2 * k)); return d ? String.fromCharCode(...d.codes).replace(/\|/g, '') : '#' + k; };
+    const topic = (t, kws) => ({ 0xFF: 'greeting', 0xFE: 'Talk', 0xFD: 'default answer' }[t] || ('keyword "' + (t < 64 ? kwName(t) : '#' + t) + '"')) + (kws.length ? ' (needs ' + kws.map(k => '"' + kwName(k) + '"').join(', ') + ')' : '');
+    for (let n = 0; n < (meta.nconv || 139); n++) {
+      const base = 0x8D0000 | rw(u8, 0x80947A + 2 * n); let y = 4;
+      const ppl = (meta.conv_people[n] || []).join(', ') || 'conversation ' + n;
+      for (let k = 0; k < 80; k++) {
+        const t = rb(u8, base + y); if (t === 0xF8) break;
+        const ln = rb(u8, base + y + 1), fl = rb(u8, base + y + 2), nk = fl & 15, kws = [];
+        for (let i = 0; i < nk; i++) kws.push(rb(u8, base + y + 3 + i));
+        let q = base + y + 3 + nk; if (fl & 0x80) q += 2;
+        const tid = rw(u8, q);
+        add(tid, 'conv', ppl + ' · ' + topic(t, kws) + (tid >= 0xC000 ? ' (Expanded Dialogue)' : ''));
+        if (!ln) break; y += 1 + ln;
+      }
+    }
+    for (let i = 0; i < 0x264; i++) { const u = meta.msg_users[i] || [], mid = rw(u8, 0x80D980 + 2 * i); add(mid, 'msg', 'Message ' + i + (u.length ? ': ' + u.slice(0, 3).join('; ') + (u.length > 3 ? ' +' + (u.length - 3) + ' more' : '') : ' (engine or menus)'));  const me = list.get(mid); if (me && !(me.msg = me.msg || []).includes(i)) me.msg.push(i); }
+    for (let k = 0; k < 64; k++) add(rw(u8, 0x8D8000 + 2 * k), 'kw', 'Keyword ' + k);
+    for (let s = 0; s < 0x113; s++) add(rw(u8, 0x8CEFB0 + 6 * s), 'name', 'Hover name of sprite $' + s.toString(16).toUpperCase().padStart(2, '0'));
+    for (let i = 0; i < 13; i++) add(rw(u8, 0x809705 + 2 * i), 'name', 'Runner name ' + i);
+    for (const [hid, wins] of Object.entries(meta.eng_win || {})) { const ws = wins.map(w => w[0] + '×' + w[1]); add(parseInt(hid, 16), 'menu', 'Game menu or screen, window ' + [...new Set(ws)].slice(0, 3).join(', ') + ' tiles'); }
+    for (const id of meta.other || []) if (!(meta.eng_win || {})[id.toString(16).toUpperCase().padStart(4, '0')]) add(id, 'other', 'Not referenced by anything known (may be unused)');
+    const out = [];
+    for (const e of list.values()) { const d = this.decode(e.id); if (d && d.codes.length <= 1500) { e.codes = d.codes; e.bytes = d.bytes; e.ptr = this.ptr(e.id); e.base = this.basePtr(e.id); out.push(e); } }
+    out.sort((a, b) => a.id - b.id);
+    return out;
+  }
+}
+
+// ---- string <-> codes. Printable ASCII as is; other glyphs as {XX} (hex code).
+function toCodes(s) {
+  const out = []; let i = 0;
+  while (i < s.length) {
+    const m = /^\{([0-9A-Fa-f]{2})\}/.exec(s.slice(i));
+    if (m) { out.push(parseInt(m[1], 16)); i += 4; continue; }
+    const ch = s[i]; i++;
+    if (ch === '\n' || ch === '\r') { out.push(32); continue; }
+    out.push(ch.charCodeAt(0));
+  }
+  return out;
+}
+function fromCodes(codes) { return codes.map(c => (c >= 32 && c < 127 && c !== 123 && c !== 125) ? String.fromCharCode(c) : '{' + c.toString(16).toUpperCase().padStart(2, '0') + '}').join(''); }
+
+// ---- writing
+function hookCode() {
+  const b = [], lab = {}, fix = [];
+  const emit = (...x) => b.push(...x), here = () => b.length;
+  const long = (op, a) => emit(op, a & 0xFF, (a >> 8) & 0xFF, a >> 16);
+  const br = (op, name) => { emit(op, 0); fix.push([b.length - 1, name]); };
+  emit(0x08, 0xC2, 0x30, 0x48, 0xDA, 0xA2, 0x00, 0x00);          // php; rep #$30; pha; phx; ldx #0
+  lab.loop = here(); emit(0x8A); long(0xCF, TABLE); br(0xB0, 'done'); // txa; cmp.l TABLE; bcs done
+  long(0xBF, TABLE + 2); emit(0xC5, 0xCF); br(0xD0, 'next');         // lda.l TABLE+2,x; cmp $CF; bne next
+  long(0xBF, TABLE + 3); emit(0xC5, 0xD0); br(0xD0, 'next');         // lda.l TABLE+3,x; cmp $D0; bne next
+  long(0xBF, TABLE + 5); emit(0x85, 0xCF);                           // lda.l TABLE+5,x; sta $CF
+  long(0xBF, TABLE + 6); emit(0x85, 0xD0); br(0x80, 'done');         // lda.l TABLE+6,x; sta $D0; bra done
+  lab.next = here(); emit(0x8A, 0x18, 0x69, 0x06, 0x00, 0xAA); br(0x80, 'loop');
+  lab.done = here(); emit(0xFA, 0x68, 0x28, 0xF4, 0x7E, 0x7E, 0xAB); long(0x5C, 0x80FE48); // plx; pla; plp; pea $7E7E; plb; jml $80FE48
+  for (const [at, name] of fix) { const d = lab[name] - (at + 1); if (d < -128 || d > 127) throw new Error('branch'); b[at] = d & 0xFF; }
+  return Uint8Array.from(b);
+}
+// edits: Map(id -> codes). inv: inventory (for slot sizes). Returns {rom, report}
+function applyTextEdits(romU8, inv, edits) {
+  let out = new Uint8Array(romU8); const T = new Texts(out), report = [];
+  // spans of every known text at its BASE pointer, to know how much room each one has in place
+  const spans = [];
+  for (const e of inv) { if (e.base == null) continue; const d = T.decodeAt(e.base); if (d) spans.push([e.base, e.base + d.bytes, e.id]); }
+  spans.sort((a, b) => a[0] - b[0]);
+  const roomAt = base => {               // bytes free from base until the next text starts; 0 if base is inside another text
+    let room = Infinity;
+    for (const [s, e] of spans) {
+      if (s < base && e > base) return 0;
+      if (s > base && (s >> 16) === (base >> 16)) { room = Math.min(room, s - base); }
+    }
+    if (room === Infinity) { const d = T.decodeAt(base); room = d ? d.bytes : 0; }
+    return room;
+  };
+  const pool = new Map();    // base ptr -> bytes (texts that must live in the pool)
+  for (const [base, p] of T.redirects) {                    // keep earlier relocations that are not edited now
+    const id = inv.find(e => e.base === base); if (id && edits.has(id.id)) continue;
+    const d = T.decodeAt(p); if (d) pool.set(base, out.slice(L(p), L(p) + d.bytes));
+  }
+  for (const [id, codes] of edits) {
+    if (codes.length > MAXLEN) throw new Error('text $' + id.toString(16) + ' is longer than ' + MAXLEN + ' characters');
+    const base = T.basePtr(id); if (base == null) throw new Error('unknown text id ' + id);
+    const enc = T.encode(codes), room = roomAt(base);
+    if (enc.length <= room) { out.set(enc, L(base)); pool.delete(base); report.push({ id, where: 'in place', size: enc.length, room }); }
+    else { pool.set(base, enc); report.push({ id, where: 'moved', size: enc.length, room }); }
+  }
+  if (pool.size || T.hooked) {
+    if (out.length < 0x200000) { const big = new Uint8Array(0x200000); big.set(out); out = big; out[0x7FD7] = 0x0B; }
+    // hook + table + pool, rebuilt from scratch
+    for (let bk = POOL_FIRST; bk <= POOL_LAST; bk++) out.fill(0, L((bk << 16) | 0x8000), L((bk << 16) | 0x8000) + 0x8000);
+    out.fill(0, L(HOOK), L(HOOK) + 0x8000);
+    out.set(hookCode(), L(HOOK));
+    let bank = POOL_FIRST, addr = 0x8000, o = 0;
+    const entries = [...pool].sort((a, b) => a[0] - b[0]);
+    if (entries.length * 6 + 2 > 0x7E00) throw new Error('too many moved texts');
+    for (const [base, bytes] of entries) {
+      if (addr + bytes.length + 2 > 0x10000) { bank++; addr = 0x8000; }
+      if (bank > POOL_LAST) throw new Error('text pool full');
+      const p = (bank << 16) | addr; out.set(bytes, L(p)); addr += bytes.length + 1;   // +1: the decoder reads words
+      const t = L(TABLE + 2 + o); out[t] = base & 0xFF; out[t + 1] = (base >> 8) & 0xFF; out[t + 2] = base >> 16; out[t + 3] = p & 0xFF; out[t + 4] = (p >> 8) & 0xFF; out[t + 5] = p >> 16;
+      o += 6;
+      const r = report.find(x => x.where === 'moved' && T.basePtr(x.id) === base); if (r) r.addr = p;
+    }
+    out[L(TABLE)] = o & 0xFF; out[L(TABLE) + 1] = o >> 8;
+    out[L(0x80FE44)] = 0x5C; out[L(0x80FE45)] = HOOK & 0xFF; out[L(0x80FE46)] = (HOOK >> 8) & 0xFF; out[L(0x80FE47)] = HOOK >> 16;
+  }
+  return { rom: out, report };
+}
+
+// ---- font preview: glyph rows for char code c (8 rows, 1bpp, MSB = left) and width in pixels
+function glyph(u8, c) { const rows = []; for (let y = 0; y < 8; y++) rows.push(u8[L(0x95F2D0 + c * 8 + y)]); return { rows, w: u8[L(0x81ABC8 + c)] }; }
+
+const api = { Texts, toCodes, fromCodes, applyTextEdits, glyph, hookCode, MAXLEN };
+if (typeof module !== 'undefined') module.exports = api; else root.ST = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>// Shadowrun (SNES) script VM tools: decompile scripts to SRScript text and compile SRScript back to bytecode.
+// VM (interpreter $80F353, handlers via $80F27E): 16-bit values on the 65816 stack; locals = thread DP+$13+n.
+// Script directory: bank $82D970+id, address $82DD18+2*id, argument bytes $82E810+id, returns-value flag
+// $82E468+id. A script = [locals size][stack size] then code; jump/call operands are offsets from the code start.
+// Natives: op $58 n, argument count $82D895+n, returns-value flag $82D7BA+n; the LAST pushed argument is the
+// routine's $00.
+(function (root) {
+'use strict';
+const L = a => ((a & 0x7F0000) >> 1) | (a & 0x7FFF);
+const NSCR = 936;
+// brand-new scripts: ids $400-$5FF (the Runner Pack uses 936-950 for its own). Directory of the new ones at
+// $AC:A400 (7 bytes each: address 3, argument bytes, returns flag, length word); header 'SRNEW' 1 at $AC:A200
+// with the entry count at $AC:A206 and the original bytes of the three hooked directory reads at $AC:A210 / A230 / A238.
+const NEW_BASE = 0x400, NEW_MAX = 0x200, NEWHDR = 0xACA200, NEWTAB = 0xACA400, NEWCODE = 0xACA240;
+const HOOKS = [[0x80C298, 25], [0x80F433, 7], [0x80F473, 7]];   // directory (bank/args/address), op $52 args, op $52 returns
+function readNewDir(u8) {
+  const m = new Map(); if (u8.length < 0x200000) return m;
+  const b = a => u8[L(a)], w = a => u8[L(a)] | (u8[L(a + 1)] << 8);
+  if (String.fromCharCode(...u8.slice(L(NEWHDR), L(NEWHDR) + 5)) !== 'SRNEW') return m;
+  const n = w(NEWHDR + 6);
+  for (let k = 0; k < n && k < NEW_MAX; k++) { const e = NEWTAB + 7 * k; if (!b(e + 2)) continue;
+    m.set(NEW_BASE + k, { addr: w(e) | (b(e + 2) << 16), args: b(e + 3) >> 1, ret: b(e + 4) !== 0, len: w(e + 5) }); }
+  return m;
+}
+
+// opcode -> [mnemonic, operand bytes]
+const OPS = {
+  0x00: ['push.b', 1], 0x02: ['push.lb', 1], 0x04: ['push.gb', 2], 0x0A: ['push.sb', 1], 0x0C: ['push.lsb', 1],
+  0x0E: ['push.gsb', 2], 0x14: ['push.w', 2], 0x16: ['push.lw', 1], 0x18: ['push.gw', 2], 0x2C: ['pop.lb', 1],
+  0x2E: ['pop.gb', 2], 0x34: ['pop.lw', 1], 0x36: ['pop.gw', 2], 0x44: ['jz', 2], 0x46: ['jnz', 2], 0x48: ['jmp', 2],
+  0x4C: ['call', 2], 0x50: ['ret', 0], 0x52: ['script', 2], 0x54: ['halt', 0], 0x56: ['end', 0], 0x58: ['native', 1],
+  0xBA: ['dup', 0], 0xBC: ['drop', 0], 0xC0: ['push0', 0], 0xC2: ['push.lb0', 0],
+};
+// two-operand ops: opcode -> [operator or function name]. Variants: _sl = left operand signed, _sr = right
+// operand signed, _ss = both. $B0 works exactly like $AA (==) and $B8 like $B2 (!=).
+const BIN = {
+  0x5C: '+', 0x5E: '-', 0x60: '*', 0x62: 'mul_sl', 0x64: 'mul_sr', 0x66: 'mul_ss', 0x68: '/', 0x6A: 'div_sl', 0x6C: 'div_sr',
+  0x6E: 'div_ss', 0x70: '%', 0x72: 'mod_sl', 0x74: 'mod_sr', 0x76: 'mod_ss', 0x7A: '<<', 0x7C: '>>', 0x7E: '&', 0x80: '|',
+  0x82: '^', 0x8A: '<', 0x8C: 'lt_sl', 0x8E: 'lt_sr', 0x92: '<=', 0x94: 'le_sl', 0x96: 'le_sr', 0x9A: '>', 0x9C: 'gt_sl',
+  0x9E: 'gt_sr', 0xA2: '>=', 0xA4: 'ge_sl', 0xA6: 'ge_sr', 0xAA: '==', 0xAC: 'eq_sl', 0xAE: 'eq_sr', 0xB0: '==',
+  0xB2: '!=', 0xB4: 'ne_sl', 0xB6: 'ne_sr', 0xB8: '!=',
+};
+const UN = { 0x78: 'neg', 0x84: '~', 0x86: 'inc', 0x88: 'dec', 0xBE: 'bool' };
+for (const [k, v] of Object.entries(BIN)) OPS[k] = [/^[a-z]/.test(v) ? v : 'bin' + v, 0];
+for (const [k, v] of Object.entries(UN)) OPS[k] = [v === '~' ? 'not' : v, 0];
+const BIN_OP = {}; for (const [k, v] of Object.entries(BIN)) if (!(+k === 0xB0 || +k === 0xB8)) BIN_OP[v] = +k;
+const UN_OP = { neg: 0x78, '~': 0x84, inc: 0x86, dec: 0x88, bool: 0xBE };
+const SAME = { 0xB0: 0xAA, 0xB8: 0xB2 };
+
+const NATIVES = {"6": "GET_REC0", "156": "SET_REC0", "2": "GET_FLAGS", "51": "OR_FLAGS", "122": "AND_FLAGS", "149": "STORE_FLAGS", "8": "GET_HP", "159": "SET_HP", "43": "DEC_HP", "39": "REFILL_HP", "202": "REFILL_MAGIC", "12": "GET_OWNER", "112": "CLEAR_OWNER", "111": "GIVE_TO_JAKE?", "196": "MARK_GONE", "197": "IS_TAKEN", "194": "GET_TYPE_REC0", "102": "SET_TYPE_REC0", "186": "GET_TYPE_FLAGS", "13": "OR_TYPE_FLAGS", "75": "AND_TYPE_FLAGS", "96": "STORE_TYPE_FLAGS", "104": "SET_TYPE_HP", "204": "GET_TYPE_OWNER", "187": "SET_TYPE_OWNER", "66": "TYPE_OWNED_BY", "116": "OWNER_JAKE?", "117": "GIVE_ITEM", "205": "UNUSED_CD", "203": "GET_TYPE", "31": "TYPE_SPRITE", "25": "TYPE_SPRITE_ATTR0", "92": "TYPE_SPRITE_ATTR1", "64": "OBJ_SPRITE_ATTR0", "177": "SPRITE_POINT_FREE?", "40": "JAKE", "132": "JAKE_ALT", "168": "CREATE_OBJECT", "184": "REMOVE_SELF", "174": "RESET_ACTIONS", "146": "GET_OBJ_BITS", "63": "SET_OBJ_BITS", "206": "OR_OBJ_BITS", "44": "AND_OBJ_BITS", "100": "PAUSE_OBJECT", "157": "RESUME_OBJECT", "91": "DETACH_THREAD?", "118": "ATTACH_THREAD?", "178": "SET_DRAW_FLAGS?", "163": "GET_DRAW_FLAGS?", "73": "DRAW_FLAG_ON?", "180": "SET_EXAMINE_TEXT", "79": "GET_X", "80": "GET_Y", "81": "GET_Z", "130": "SET_POS", "155": "ADD_Z", "181": "PLACE_AT_POINT", "10": "DISTANCE_TO_JAKE", "145": "X_DISTANCE", "93": "GET_DIRECTION", "106": "SET_DIRECTION", "27": "FACE", "108": "FACE_JAKE", "41": "DIRECTION_TO_JAKE", "209": "ANIMATE", "208": "PLAY_ANIM?", "110": "ANIM_FINISHED?", "34": "GET_BASE_ANIM", "36": "SET_BASE_ANIM", "20": "ADD_BASE_ANIM", "48": "SUB_BASE_ANIM", "121": "SET_VELOCITY", "77": "STOP_VELOCITY", "68": "GET_VEL_X", "70": "GET_VEL_Y", "71": "GET_VEL_Z", "115": "MOVE_TOWARD", "98": "LOB_TOWARD", "216": "LOB_TO_POINT", "128": "WALK_TO_POINT", "29": "WALK_TO_POINT_AXIS?", "47": "WALK_TO_XY", "185": "WALK_TO_XY_AXIS?", "37": "FOLLOW", "176": "FOLLOW_AXIS?", "33": "FOLLOW_JAKE", "173": "FOLLOW_JAKE_AXIS?", "59": "STOP_WALKING", "167": "WALK_TO_CURSOR", "67": "WALK_TO_CURSOR_AXIS?", "26": "STEP_IN_FROM_ENTRY?", "11": "TAKE_FORMATION_SPOT", "171": "ADD_COMBATANT", "191": "REMOVE_COMBATANT", "89": "COMBAT_ACTIVE", "95": "IN_COMBAT", "72": "PREV_COMBATANT", "78": "RANDOM_VISIBLE_COMBATANT", "7": "RANDOM_PARTY_TARGET", "133": "NEAREST_PARTY_TARGET", "105": "CAN_HIT", "16": "ATTACK", "90": "ATTACK_WITH_WEAPON", "88": "JAKE_ATTACK_CURSOR", "124": "AREA_DAMAGE?", "1": "SELECT_CHARACTER", "15": "GET_STRENGTH", "65": "GET_STAT0?", "144": "GET_STAT1?", "211": "GET_STAT4?", "35": "EQUIP_WEAPON", "52": "EQUIP_ARMOR", "38": "ADD_COUNT?", "198": "CARRIED_COUNT", "170": "SPEND_MAGIC", "139": "ADD_MAGIC", "120": "HIRE_RUNNER", "131": "DISMISS_RUNNER", "213": "RUNNER_TIME_LEFT", "152": "ADD_NUYEN", "190": "PAY", "182": "SUB_NUYEN", "123": "ADD_KARMA", "160": "SUB_KARMA", "125": "JACK_IN?", "87": "GET_VAR", "18": "SET_VAR", "154": "OR_VAR", "3": "AND_VAR", "212": "GET_PROGRESS", "218": "RAISE_PROGRESS", "151": "KNOWS_KEYWORD", "113": "LEARN_KEYWORD", "143": "FORGET_KEYWORD", "109": "ADD_CHOICE", "137": "CHOOSE_FROM_LIST", "126": "CURRENT_MAP", "23": "MAP_OF_LOCATION", "86": "WARP", "84": "WARP_ENTRY", "200": "START_CORTEX_TIMER", "42": "CORTEX_TIMER_OFF?", "195": "CORTEX_TIMER_ACTIVE", "17": "LEAVE_MAIN_LOOP_A?", "217": "LEAVE_MAIN_LOOP_B?", "147": "RUN_PENDING_SCRIPT?", "153": "TEXT_BOX", "214": "TEXT_APPEND", "199": "FLOATER", "114": "YES_NO", "148": "CONVERSATION", "127": "END_CONVERSATION", "135": "RESET_CONVERSATION?", "166": "CLOSE_TEXT_BOXES", "61": "OPEN_WINDOW", "150": "CLOSE_WINDOW", "134": "WINDOW_PRINT_POS?", "14": "WINDOW_SET?", "83": "WINDOW_SET2?", "4": "PRINT_BIG_NUMBER", "21": "PRINT_NUMBER", "19": "ACTION_MENU", "60": "REST_MENU", "175": "STATUS_SCREEN", "28": "STATUS_SCREEN_CURSOR", "207": "JAKE_INPUT", "162": "WAIT_BUTTON", "97": "JOY_PRESSED", "210": "JOY_HELD", "136": "CURSOR_X", "138": "CURSOR_Y", "188": "PICK_OBJECT", "165": "PICK_OBJECT_FROM", "201": "PICK_OBJECT_NEAR?", "192": "PICK_TYPE?", "215": "PICK_TYPE2?", "142": "PICK_TYPE3?", "164": "HIDE_CURSOR", "69": "HIDE_CURSOR_REFRESH", "193": "LAST_MENU_RESULT?", "74": "CURSOR_ON_JAKE", "46": "CURSOR_ON_JAKE2", "107": "CURSOR_HOME", "103": "CURSOR_POS_B", "183": "CURSOR_POS_B2", "141": "CURSOR_RESET?", "158": "WAIT", "62": "RANDOM", "99": "RAND_RAW", "179": "HALVE_SIGNED", "76": "PLAY_SFX?", "82": "PLAY_SFX_AT?", "85": "SCREEN_EFFECT?", "45": "LAYER_TOGGLE?", "32": "SCREEN_20?", "9": "RING_CREATE", "119": "RING4_CREATE", "30": "RING_UPDATE", "169": "RING_MOVE", "24": "RING_RESET", "5": "RING_PARAM_5D", "161": "RING_PARAM_5F", "189": "RING_PARAM_61", "22": "RING_PARAM_63", "94": "BOB_A", "101": "BOB_B", "172": "ORBIT_START", "140": "ORBIT_STEP", "129": "ORBIT_81?", "49": "ORBIT_SLOT0", "50": "ORBIT_SLOT1", "53": "ORBIT_SLOT2", "54": "ORBIT_SLOT3", "55": "ORBIT_SLOT4", "56": "ORBIT_SLOT5", "57": "ORBIT_SLOT6", "58": "ORBIT_SLOT7", "0": "BROKEN_00"};
+const GLOBALS = { 0x3C11: 'karma', 0x3C00: 'max_stamina', 0x3BFB: 'body', 0x3BFC: 'quickness', 0x3BFD: 'strength',
+  0x3BFF: 'charisma', 0x2DE2: 'next_location', 0x3C18: 'dermal', 0x3C19: 'wired' };
+const GLOBAL_ADDR = {}; for (const [k, v] of Object.entries(GLOBALS)) GLOBAL_ADDR[v] = +k;
+const NATIVE_ID = {}; for (const [k, v] of Object.entries(NATIVES)) { NATIVE_ID[v.replace('?', '')] = +k; }
+
+const hex = (n, w) => '$' + n.toString(16).toUpperCase().padStart(w, '0');
+
+class VM {
+  constructor(u8) { this.u8 = u8; this.newDir = readNewDir(u8); this.pending = new Map(); this.gone = new Set(); }
+  // pending: id -> [args, returns] of new scripts being written in the editor (not in this ROM yet)
+  known(id) { return id < NSCR || ((this.newDir.has(id) || this.pending.has(id)) && !this.gone.has(id)); }   // gone: new scripts deleted in the editor
+  inRom(id) { return id < NSCR || this.newDir.has(id); }
+  b(a) { return this.u8[L(a)]; }
+  w(a) { return this.u8[L(a)] | (this.u8[L(a + 1)] << 8); }
+  scriptAddr(id) { if (id >= NSCR) { const n = this.newDir.get(id); return n ? n.addr : 0; } return (this.b(0x82D970 + id) << 16) | this.w(0x82DD18 + 2 * id); }
+  scriptArgs(id) { const p = this.pending.get(id); if (p) return p[0]; if (id < NSCR) return this.b(0x82E810 + id) >> 1; const n = this.newDir.get(id); return n ? n.args : 1; }
+  scriptRet(id) { const p = this.pending.get(id); if (p) return p[1]; if (id < NSCR) return this.b(0x82E468 + id) !== 0; const n = this.newDir.get(id); return n ? n.ret : false; }
+  nativeArgs(n) { return this.b(0x82D895 + n); }
+  nativeRet(n) { return this.b(0x82D7BA + n) !== 0; }
+  header(id) { const a = this.scriptAddr(id); return [this.b(a), this.b(a + 1)]; }
+  // reachable instructions: [{pc, op, name, arg, len}]
+  decode(id) {
+    const base = this.scriptAddr(id) + 2, seen = new Map(), todo = [0];
+    while (todo.length) {
+      let pc = todo.pop();
+      while (!seen.has(pc) && pc >= 0 && pc < 0x4000) {
+        const op = this.b(base + pc), d = OPS[op];
+        if (!d) { seen.set(pc, { pc, op, name: '??', arg: null, len: 1 }); break; }
+        const [name, n] = d; const arg = n === 1 ? this.b(base + pc + 1) : n === 2 ? this.w(base + pc + 1) : null;
+        seen.set(pc, { pc, op, name, arg, len: 1 + n });
+        if (name === 'jz' || name === 'jnz' || name === 'call') todo.push(arg);
+        if (name === 'jmp') { todo.push(arg); break; }
+        if (name === 'end' || name === 'ret' || name === 'halt') break;
+        if (name === 'script' && !this.known(arg)) break;
+        pc += 1 + n;
+      }
+    }
+    return [...seen.values()].sort((a, b) => a.pc - b.pc);
+  }
+  // stack effect [pops, pushes]
+  effect(ins, sigs) {
+    const { name, op, arg } = ins;
+    if (name.startsWith('push')) return [0, 1];
+    if (name.startsWith('pop.') || name === 'drop' || name === 'jz' || name === 'jnz' || name === 'end') return [1, 0];
+    if (BIN[op] != null) return [2, 1];
+    if (UN[op] != null) return [1, 1];
+    if (name === 'dup') return [1, 2];
+    if (name === 'native') return [this.nativeArgs(arg), this.nativeRet(arg) ? 1 : 0];
+    if (name === 'script') return this.known(arg) ? [this.scriptArgs(arg), this.scriptRet(arg) ? 1 : 0] : [0, 0];
+    if (name === 'call') return (sigs && sigs.get(arg)) || [0, 0];
+    return [0, 0];
+  }
+  subSig(byPc, target, sigs, depth) {
+    if (depth > 4) return null;
+    const found = new Set(), seen = new Set(), todo = [[target, 0, 0]];
+    while (todo.length) {
+      const [pc, d0, mn0] = todo.pop(); let d = d0, mn = mn0;
+      const key = pc + ':' + d; if (seen.has(key) || !byPc.has(pc) || seen.size > 4000) continue; seen.add(key);
+      const ins = byPc.get(pc);
+      if (ins.name === 'call' && !sigs.has(ins.arg)) { sigs.set(ins.arg, ins.arg !== target ? this.subSig(byPc, ins.arg, sigs, depth + 1) : null); if (!sigs.get(ins.arg)) return null; }
+      const [po, pu] = this.effect(ins, sigs); d -= po; mn = Math.min(mn, d); d += pu;
+      if (ins.name === 'ret') { found.add((-mn) + ',' + (d - mn)); continue; }
+      if (ins.name === 'end' || ins.name === 'halt' || ins.name === '??') continue;
+      if (ins.name === 'jz' || ins.name === 'jnz' || ins.name === 'jmp') todo.push([ins.arg, d, mn]);
+      if (ins.name !== 'jmp') todo.push([pc + ins.len, d, mn]);
+    }
+    return found.size === 1 ? [...found][0].split(',').map(Number) : null;
+  }
+  // ------------------------------------------------------------ decompiler
+  decompile(id, annotate) {
+    const ins = this.decode(id), byPc = new Map(ins.map(i => [i.pc, i]));
+    const targets = new Set(ins.filter(i => ['jz', 'jnz', 'jmp', 'call'].includes(i.name)).map(i => i.arg));
+    const subs = new Set(ins.filter(i => i.name === 'call').map(i => i.arg));
+    const jumpTargets = new Set(ins.filter(i => ['jz', 'jnz', 'jmp'].includes(i.name)).map(i => i.arg));
+    const sigs = new Map(); for (const t of subs) if (!sigs.has(t)) sigs.set(t, this.subSig(byPc, t, sigs, 0));
+    const lines = [], st = []; let entryArgs = this.scriptArgs(id), inEntry = true, prevEnd = null;
+    const [h0, h1] = this.header(id);
+    lines.push('script ' + hex(id, 3) + ' args ' + this.scriptArgs(id) + ' returns ' + (this.scriptRet(id) ? 'yes' : 'no') + ' locals ' + h0 + ' stack ' + h1);
+    const pop = () => { if (st.length) return st.pop(); if (inEntry && entryArgs > 0) { entryArgs--; return 'arg' + (entryArgs + 1); } return 'pop()'; };
+    const flush = () => { while (st.length) lines.push('    push ' + st.shift()); };
+    const emit = (s, note) => { lines.push('    ' + s + (note ? '    ; ' + note : '')); };
+    const lit = i => {
+      if (i.name === 'push0') return '0';
+      if (i.name === 'push.b') return i.arg === 0 ? '$00' : String(i.arg);
+      if (i.name === 'push.sb') return i.arg & 0x80 ? String(i.arg - 256) : '+' + i.arg;
+      return hex(i.arg, 4);
+    };
+    const gname = (a, kind) => {
+      if (kind === 'gw') return GLOBALS[a] && a !== 0x3C18 && a !== 0x3C19 ? GLOBALS[a] + '.w' : 'gw[' + hex(a, 4) + ']';
+      if (kind === 'gb' && GLOBALS[a]) return GLOBALS[a];
+      if (kind === 'gb' && a >= 0x3BBB && a < 0x3BBB + 64) return 'var[' + (a - 0x3BBB) + ']';
+      return kind + '[' + hex(a, 4) + ']';
+    };
+    for (const i of ins) {
+      if (targets.has(i.pc) || (prevEnd != null && i.pc !== prevEnd)) {
+        inEntry = false; flush(); const h4 = i.pc.toString(16).toUpperCase().padStart(4, '0');
+        if (subs.has(i.pc)) lines.push('sub_' + h4 + ':');
+        if (!subs.has(i.pc) || jumpTargets.has(i.pc)) lines.push('L_' + h4 + ':');
+      }
+      prevEnd = i.pc + i.len;
+      const n = i.name, a = i.arg;
+      if (n === 'push0' || n === 'push.b' || n === 'push.sb' || n === 'push.w') st.push(lit(i));
+      else if (n === 'push.lb0') st.push('self');
+      else if (n === 'push.lb') st.push('L.b' + a);
+      else if (n === 'push.lsb') st.push('L.sb' + a);
+      else if (n === 'push.lw') st.push('L.w' + a);
+      else if (n === 'push.gb') st.push(gname(a, 'gb'));
+      else if (n === 'push.gsb') st.push(gname(a, 'gsb'));
+      else if (n === 'push.gw') st.push(gname(a, 'gw'));
+      else if (n === 'pop.lb') emit((a === 0 ? 'self' : 'L.b' + a) + ' = ' + pop());
+      else if (n === 'pop.lw') emit('L.w' + a + ' = ' + pop());
+      else if (n === 'pop.gb') emit(gname(a, 'gb') + ' = ' + pop());
+      else if (n === 'pop.gw') emit(gname(a, 'gw') + ' = ' + pop());
+      else if (BIN[i.op] != null) { const y = pop(), x = pop(), o = BIN[i.op]; st.push(/^[a-z]/.test(o) ? o + '(' + x + ', ' + y + ')' : '(' + x + ' ' + o + ' ' + y + ')'); }
+      else if (UN[i.op] != null) { const x = pop(), o = UN[i.op]; st.push(o === '~' ? '(~' + x + ')' : o + '(' + x + ')'); }
+      else if (n === 'dup') { const x = pop(); flush(); emit('push dup(' + x + ')'); }
+      else if (n === 'drop') { const x = pop(); if (x === 'pop()' || /^arg\d+$/.test(x)) { flush(); emit('drop'); } else { flush(); emit(/^sub_/.test(x) ? 'drop ' + x : x); } }
+      else if (n === 'jz' || n === 'jnz') { const c = pop(); flush(); emit('if ' + (n === 'jz' ? 'not ' : '') + c + ' goto L_' + a.toString(16).toUpperCase().padStart(4, '0')); }
+      else if (n === 'jmp') { flush(); emit('goto L_' + a.toString(16).toUpperCase().padStart(4, '0')); }
+      else if (n === 'call') {
+        const sg = sigs.get(a), nm = 'sub_' + a.toString(16).toUpperCase().padStart(4, '0');
+        if (sg && sg[1] <= 1) { const args = []; for (let k = 0; k < sg[0]; k++) args.unshift(pop()); const c = nm + '(' + args.join(', ') + ')'; if (sg[1]) st.push(c); else { flush(); emit(c); } }
+        else { flush(); emit('gosub ' + nm); }
+      }
+      else if (n === 'ret') { flush(); emit('return'); }
+      else if (n === 'end') { const v = pop(); flush(); emit(v === 'pop()' || /^arg\d+$/.test(v) ? 'end' : 'end ' + v); }
+      else if (n === 'halt') { flush(); emit('halt'); }
+      else if (n === 'script') {
+        if (!this.known(a)) { flush(); emit('script_' + a.toString(16).toUpperCase().padStart(3, '0') + '()', 'outside the directory'); continue; }
+        const args = []; for (let k = 0; k < this.scriptArgs(a); k++) args.unshift(pop());
+        const c = 'script_' + a.toString(16).toUpperCase().padStart(3, '0') + '(' + args.join(', ') + ')';
+        if (this.scriptRet(a)) st.push(c); else { flush(); emit(c, annotate && annotate('script', a, args)); }
+      }
+      else if (n === 'native') {
+        const args = []; for (let k = 0; k < this.nativeArgs(a); k++) args.unshift(pop());
+        const nm = NATIVES[a] ? NATIVES[a].replace('?', '') : 'native_' + a.toString(16).toUpperCase().padStart(2, '0');
+        const c = nm + '(' + args.join(', ') + ')';
+        if (this.nativeRet(a)) st.push(c); else { flush(); emit(c, annotate && annotate('native', a, args)); }
+      }
+      else { flush(); emit('opcode_' + i.op.toString(16).toUpperCase().padStart(2, '0') + '()', 'unknown opcode'); }
+    }
+    flush();
+    return lines.join('\n') + '\n';
+  }
+}
+
+// ------------------------------------------------------------ compiler
+class CompileError extends Error { constructor(msg, line) { super('line ' + line + ': ' + msg); this.line = line; this.msg = msg; } }
+function tokenize(src, lineNo) {
+  const toks = []; let i = 0;
+  const re = /\s*(?:(\$[0-9A-Fa-f]+)|(\+\d+)|(\d+)|([A-Za-z_][A-Za-z0-9_.]*\??)|(<<|>>|<=|>=|==|!=|[-+*/%&|^~()<>=,{}\[\]:]))/y;
+  while (i < src.length) {
+    if (/^\s*(;|\/\/)/.test(src.slice(i))) break;
+    if (/^\s*$/.test(src.slice(i))) break;
+    re.lastIndex = i; const m = re.exec(src);
+    if (!m) throw new CompileError('cannot read "' + src.slice(i).trim().slice(0, 20) + '"', lineNo);
+    i = re.lastIndex;
+    const prev = toks[toks.length - 1], afterValue = prev && (prev.t === 'num' || prev.t === 'id' || prev.s === ')' || prev.s === ']');
+    if (m[1]) toks.push({ t: 'num', s: m[1] }); else if (m[2]) { if (afterValue) { toks.push({ t: 'op', s: '+' }); toks.push({ t: 'num', s: m[2].slice(1) }); } else toks.push({ t: 'num', s: m[2] }); } else if (m[3]) toks.push({ t: 'num', s: m[3] });
+    else if (m[4]) toks.push({ t: 'id', s: m[4] }); else toks.push({ t: 'op', s: m[5] });
+  }
+  return toks;
+}
+function numToPush(s, neg, line) {   // literal text -> [opcode, operand bytes]
+  let v;
+  if (s[0] === '$') {
+    v = parseInt(s.slice(1), 16); const digits = s.length - 1;
+    if (neg) v = -v;
+    if (digits === 4 && !neg) return [0x14, v & 0xFF, v >> 8];
+    if (digits === 2 && !neg) return [0x00, v];
+  } else if (s[0] === '+') { v = parseInt(s.slice(1), 10); if (v > 127) throw new CompileError('+N literals are signed bytes (0..127)', line); return [0x0A, v]; }
+  else { v = parseInt(s, 10); if (neg) v = -v; }
+  if (v < -32768 || v > 65535) throw new CompileError('number out of range: ' + (neg ? '-' : '') + s, line);
+  if (v === 0) return [0xC0];
+  if (v > 0 && v < 256) return [0x00, v];
+  if (v < 0 && v >= -128) return [0x0A, v & 0xFF];
+  v &= 0xFFFF; return [0x14, v & 0xFF, v >> 8];
+}
+const PREC = [['|'], ['^'], ['&'], ['==', '!='], ['<', '<=', '>', '>='], ['<<', '>>'], ['+', '-'], ['*', '/', '%']];
+const OPNAME = { '+': 0x5C, '-': 0x5E, '*': 0x60, '/': 0x68, '%': 0x70, '<<': 0x7A, '>>': 0x7C, '&': 0x7E, '|': 0x80, '^': 0x82,
+  '<': 0x8A, '<=': 0x92, '>': 0x9A, '>=': 0xA2, '==': 0xAA, '!=': 0xB2 };
+const VARIANT = {}; for (const [k, v] of Object.entries(BIN)) if (/^[a-z]/.test(v)) VARIANT[v] = +k;
+
+class Compiler {
+  constructor(vm, sigOverride) { this.vm = vm; this.sigOverride = sigOverride || {}; }
+  scriptSig(id) { const o = this.sigOverride[id]; return o ? o : [this.vm.scriptArgs(id), this.vm.scriptRet(id)]; }
+  // parse a full expression from tokens
+  parseExpr(tk, line) {
+    let p = 0;
+    const peek = () => tk[p], next = () => tk[p++];
+    const expect = s => { const t = next(); if (!t || t.s !== s) throw new CompileError('expected "' + s + '"' + (t ? ' but found "' + t.s + '"' : ''), line); };
+    const bin = lvl => {
+      if (lvl === PREC.length) return unary();
+      let left = bin(lvl + 1);
+      while (peek() && peek().t === 'op' && PREC[lvl].includes(peek().s)) { const o = next().s; const right = bin(lvl + 1); left = { k: 'bin', op: OPNAME[o], a: left, b: right }; }
+      return left;
+    };
+    const unary = () => {
+      const t = peek();
+      if (t && t.t === 'op' && t.s === '-') { next(); const u = peek(); if (u && u.t === 'num') { next(); return { k: 'num', code: numToPush(u.s, true, line) }; } return { k: 'un', op: 0x78, a: unary() }; }
+      if (t && t.t === 'op' && t.s === '~') { next(); return { k: 'un', op: 0x84, a: unary() }; }
+      return primary();
+    };
+    const args = () => { expect('('); const out = []; if (peek() && peek().s === ')') { next(); return out; }
+      for (;;) { out.push(bin(0)); const t = next(); if (!t) throw new CompileError('missing ")"', line); if (t.s === ')') return out; if (t.s !== ',') throw new CompileError('expected "," or ")"', line); } };
+    const primary = () => {
+      const t = next(); if (!t) throw new CompileError('expression expected', line);
+      if (t.t === 'num') return { k: 'num', code: numToPush(t.s, false, line) };
+      if (t.t === 'op' && t.s === '(') { const e = bin(0); expect(')'); return e; }
+      if (t.t !== 'id') throw new CompileError('unexpected "' + t.s + '"', line);
+      const s = t.s;
+      if (peek() && peek().s === '[' && /^(gb|gsb|gw|var)$/.test(s)) { next(); const n = next(); expect(']'); if (!n || n.t !== 'num') throw new CompileError('number expected in []', line);
+        const v = n.s[0] === '$' ? parseInt(n.s.slice(1), 16) : parseInt(n.s, 10);
+        if (s === 'var') { if (v < 0 || v > 63) throw new CompileError('var[n] has n from 0 to 63', line); return { k: 'g', kind: 'gb', a: 0x3BBB + v }; }
+        return { k: 'g', kind: s, a: v }; }
+      if (peek() && peek().s === '(') {
+        const as = args(), nm = s.replace('?', '');
+        if (nm === 'pop' && !as.length) return { k: 'pop' };
+        if (nm === 'dup') { if (as.length !== 1) throw new CompileError('dup takes one value', line); return { k: 'dup', a: as[0] }; }
+        if (UN_OP[nm] != null && nm !== '~') { if (as.length !== 1) throw new CompileError(nm + ' takes one value', line); return { k: 'un', op: UN_OP[nm], a: as[0] }; }
+        if (VARIANT[nm] != null) { if (as.length !== 2) throw new CompileError(nm + ' takes two values', line); return { k: 'bin', op: VARIANT[nm], a: as[0], b: as[1] }; }
+        let m;
+        if ((m = /^script_([0-9A-Fa-f]{1,3})$/.exec(nm))) { const id = parseInt(m[1], 16); const [na, rt] = this.scriptSig(id);
+          if (id >= NEW_BASE && !this.vm.known(id) && !this.sigOverride[id]) throw new CompileError('there is no new script ' + hex(id, 3) + ' (yet)', line);
+          if (this.vm.known(id) && as.length !== na) throw new CompileError('script ' + hex(id, 3) + ' takes ' + na + ' argument' + (na === 1 ? '' : 's') + ', not ' + as.length, line);
+          return { k: 'script', id, args: as, ret: rt }; }
+        if ((m = /^sub_([0-9A-Za-z_]+)$/.exec(nm))) return { k: 'call', label: nm, args: as };
+        let nid = NATIVE_ID[nm]; if (nid == null && (m = /^native_([0-9A-Fa-f]{2})$/.exec(nm))) nid = parseInt(m[1], 16);
+        if (nid == null) throw new CompileError('unknown command "' + nm + '"', line);
+        const na = this.vm.nativeArgs(nid); if (as.length !== na) throw new CompileError(nm + ' takes ' + na + ' argument' + (na === 1 ? '' : 's') + ', not ' + as.length, line);
+        return { k: 'native', id: nid, args: as, ret: this.vm.nativeRet(nid) };
+      }
+      let m;
+      if (s === 'self') return { k: 'self' };
+      if ((m = /^arg(\d+)$/.exec(s))) return { k: 'pop' };
+      if ((m = /^L\.(b|sb|w)(\d+)$/.exec(s))) return { k: 'l', kind: m[1], n: +m[2] };
+      if ((m = /^([a-z_]+)(\.w)?$/.exec(s)) && GLOBAL_ADDR[m[1]] != null) return { k: 'g', kind: m[2] ? 'gw' : 'gb', a: GLOBAL_ADDR[m[1]] };
+      throw new CompileError('unknown name "' + s + '"', line);
+    };
+    const e = bin(0);
+    if (p < tk.length) throw new CompileError('unexpected "' + tk[p].s + '"', line);
+    return e;
+  }
+  gen(e, out, line) {   // expression -> bytes (pushes exactly one value; 'pop' pushes nothing: the value is already there)
+    const k = e.k;
+    if (k === 'num') out.code.push(...e.code);
+    else if (k === 'pop') {}
+    else if (k === 'self') out.code.push(0xC2);
+    else if (k === 'l') { if (e.n > 255) throw new CompileError('local number too big', line); out.code.push(e.kind === 'b' ? 0x02 : e.kind === 'sb' ? 0x0C : 0x16, e.n); out.locals = Math.max(out.locals, e.n + (e.kind === 'w' ? 2 : 1)); }
+    else if (k === 'g') out.code.push(e.kind === 'gb' ? 0x04 : e.kind === 'gsb' ? 0x0E : 0x18, e.a & 0xFF, e.a >> 8);
+    else if (k === 'bin') { this.gen(e.a, out, line); this.gen(e.b, out, line); out.code.push(e.op); }
+    else if (k === 'un') { this.gen(e.a, out, line); out.code.push(e.op); }
+    else if (k === 'native') { if (!e.ret) throw new CompileError(NATIVES[e.id] + ' does not give a value', line); for (const a of e.args) this.gen(a, out, line); out.code.push(0x58, e.id); }
+    else if (k === 'script') { if (!e.ret) throw new CompileError('script ' + hex(e.id, 3) + ' does not give a value', line); for (const a of e.args) this.gen(a, out, line); out.code.push(0x52, e.id & 0xFF, e.id >> 8); }
+    else if (k === 'call') { for (const a of e.args) this.gen(a, out, line); out.code.push(0x4C, 0, 0); out.fix.push({ at: out.code.length - 2, label: e.label, line }); }
+    else if (k === 'dup') throw new CompileError('dup(...) is only allowed as "push dup(...)"', line);
+    else throw new CompileError('cannot use this here', line);
+  }
+  store(target, out, line) {
+    const t = target;
+    if (t.k === 'self') out.code.push(0x2C, 0);
+    else if (t.k === 'l') { if (t.kind === 'sb') throw new CompileError('write L.b' + t.n + ', not L.sb' + t.n, line); out.code.push(t.kind === 'b' ? 0x2C : 0x34, t.n); out.locals = Math.max(out.locals, t.n + (t.kind === 'w' ? 2 : 1)); }
+    else if (t.k === 'g') { if (t.kind === 'gsb') throw new CompileError('write gb[...], not gsb[...]', line); out.code.push(t.kind === 'gb' ? 0x2E : 0x36, t.a & 0xFF, t.a >> 8); }
+    else throw new CompileError('cannot assign to this', line);
+  }
+  // source -> {header:{id,args,ret,locals,stack}, code:Uint8Array, lines}
+  compile(src) {
+    const out = { code: [], fix: [], labels: new Map(), locals: 0 }, blocks = [];
+    let header = null, auto = 0;
+    const lines = src.split('\n');
+    const label = () => '@' + (auto++);
+    const place = (name, line) => { if (out.labels.has(name)) throw new CompileError('label ' + name + ' is defined twice', line); out.labels.set(name, out.code.length); };
+    const jump = (op, name, line) => { out.code.push(op, 0, 0); out.fix.push({ at: out.code.length - 2, label: name, line }); };
+    for (let li = 0; li < lines.length; li++) {
+      const line = li + 1, raw = lines[li]; let tk = tokenize(raw, line); if (!tk.length) continue;
+      const s0 = tk[0].s;
+      if (s0 === 'script' && tk[0].t === 'id' && (tk.length === 1 || tk[1].t === 'num')) {
+        header = { args: 0, ret: false, locals: null, stack: null };
+        if (tk[1]) header.id = parseInt(tk[1].s.replace('$', ''), tk[1].s[0] === '$' ? 16 : 10);
+        for (let k = 2; k < tk.length; k += 2) { const key = tk[k].s, v = tk[k + 1] && tk[k + 1].s;
+          if (key === 'args') header.args = +v; else if (key === 'returns') header.ret = v === 'yes'; else if (key === 'locals') header.locals = +v; else if (key === 'stack') header.stack = +v;
+          else throw new CompileError('unknown header word "' + key + '"', line); }
+        continue;
+      }
+      // label
+      if (tk.length === 2 && tk[0].t === 'id' && tk[1].s === ':') { place(s0, line); continue; }
+      if (tk.length >= 2 && tk[tk.length - 1].s === ':' && tk[0].t === 'id' && tk.length === 2) { place(s0, line); continue; }
+      if (raw.trim().endsWith(':') && tk.length === 1 && tk[0].t === 'id') { place(s0, line); continue; }
+      // closing brace (with optional else)
+      if (s0 === '}') {
+        const b = blocks.pop(); if (!b) throw new CompileError('"}" without a matching "{"', line);
+        if (tk[1] && tk[1].s === 'else') {
+          if (b.kind !== 'if') throw new CompileError('else only follows an if block', line);
+          if (!tk[2] || tk[2].s !== '{' || tk.length !== 3) throw new CompileError('write "} else {"', line);
+          const end = label(); jump(0x48, end, line); place(b.next, line); blocks.push({ kind: 'else', next: end, line }); continue;
+        }
+        if (tk.length > 1) throw new CompileError('unexpected text after "}"', line);
+        if (b.kind === 'while') { jump(0x48, b.top, line); }
+        place(b.next, line); continue;
+      }
+      if (s0 === 'if' || s0 === 'while') {
+        let neg = false, rest = tk.slice(1);
+        if (rest[0] && rest[0].s === 'not') { neg = true; rest = rest.slice(1); }
+        if (rest.length && rest[rest.length - 1].s === '{') {
+          const top = label(), next = label();
+          if (s0 === 'while') place(top, line);
+          this.gen(this.parseExpr(rest.slice(0, -1), line), out, line);
+          jump(neg ? 0x46 : 0x44, next, line);
+          blocks.push({ kind: s0, top, next, line }); continue;
+        }
+        if (s0 === 'if') {
+          const gi = rest.findIndex(t => t.s === 'goto');
+          if (gi < 1 || gi !== rest.length - 2) throw new CompileError('write "if <condition> goto <label>" or "if <condition> {"', line);
+          this.gen(this.parseExpr(rest.slice(0, gi), line), out, line);
+          jump(neg ? 0x44 : 0x46, rest[gi + 1].s, line); continue;
+        }
+        throw new CompileError('write "while <condition> {"', line);
+      }
+      if (s0 === 'goto') { if (tk.length !== 2) throw new CompileError('write "goto <label>"', line); jump(0x48, tk[1].s, line); continue; }
+      if (s0 === 'gosub') { if (tk.length !== 2) throw new CompileError('write "gosub <label>"', line); jump(0x4C, tk[1].s, line); continue; }
+      if (s0 === 'return' && tk.length === 1) { out.code.push(0x50); continue; }
+      if (s0 === 'halt' && tk.length === 1) { out.code.push(0x54); continue; }
+      if (s0 === 'drop') { if (tk.length > 1) this.gen(this.parseExpr(tk.slice(1), line), out, line); out.code.push(0xBC); continue; }
+      if (s0 === 'end') { if (tk.length > 1) this.gen(this.parseExpr(tk.slice(1), line), out, line); out.code.push(0x56); continue; }
+      if (s0 === 'push') {
+        const e = this.parseExpr(tk.slice(1), line);
+        if (e.k === 'dup') { this.gen(e.a, out, line); out.code.push(0xBA); } else this.gen(e, out, line);
+        continue;
+      }
+      // assignment?
+      const eq = tk.findIndex(t => t.s === '=');
+      if (eq > 0) {
+        const target = this.parseExpr(tk.slice(0, eq), line), value = this.parseExpr(tk.slice(eq + 1), line);
+        this.gen(value, out, line); this.store(target, out, line); continue;
+      }
+      // call / expression statement
+      const e = this.parseExpr(tk, line);
+      if (e.k === 'native') { for (const a of e.args) this.gen(a, out, line); out.code.push(0x58, e.id); if (e.ret) out.code.push(0xBC); continue; }
+      if (e.k === 'script') { for (const a of e.args) this.gen(a, out, line); out.code.push(0x52, e.id & 0xFF, e.id >> 8); if (e.ret) out.code.push(0xBC); continue; }
+      if (e.k === 'call') { this.gen(e, out, line); out.call_result_unknown = true; continue; }
+      // any other expression: evaluate and drop
+      this.gen(e, out, line); out.code.push(0xBC);
+    }
+    if (blocks.length) throw new CompileError('"{" opened here is never closed', blocks[blocks.length - 1].line);
+    for (const f of out.fix) {
+      if (!out.labels.has(f.label)) throw new CompileError('label ' + f.label + ' does not exist', f.line);
+      const v = out.labels.get(f.label); out.code[f.at] = v & 0xFF; out.code[f.at + 1] = v >> 8;
+    }
+    if (out.code.length > 0x3F00) throw new CompileError('script is too long (' + out.code.length + ' bytes)', lines.length);
+    return { header: header || { args: 0, ret: false }, code: Uint8Array.from(out.code), locals: out.locals };
+  }
+}
+
+// instruction stream of raw code bytes (for comparisons and stack analysis)
+function decodeBytes(code) {
+  const seen = new Map(), todo = [0];
+  while (todo.length) {
+    let pc = todo.pop();
+    while (!seen.has(pc) && pc >= 0 && pc < code.length) {
+      const op = code[pc], d = OPS[op]; if (!d) { seen.set(pc, { pc, op, name: '??', arg: null, len: 1 }); break; }
+      const [name, n] = d; const arg = n === 1 ? code[pc + 1] : n === 2 ? code[pc + 1] | (code[pc + 2] << 8) : null;
+      seen.set(pc, { pc, op, name, arg, len: 1 + n });
+      if (name === 'jz' || name === 'jnz' || name === 'call') todo.push(arg);
+      if (name === 'jmp') { todo.push(arg); break; }
+      if (name === 'end' || name === 'ret' || name === 'halt') break;
+      pc += 1 + n;
+    }
+  }
+  return [...seen.values()].sort((a, b) => a.pc - b.pc);
+}
+// normalised stream: positions replaced by instruction index, equivalent opcodes merged
+function normalise(ins) {
+  const idx = new Map(ins.map((x, k) => [x.pc, k]));
+  return ins.map(x => { let op = SAME[x.op] != null ? SAME[x.op] : x.op; let arg = x.arg;
+    if (['jz', 'jnz', 'jmp', 'call'].includes(x.name)) arg = 'i' + idx.get(arg);
+    if (x.op === 0x02 && arg === 0) { op = 0xC2; arg = null; }          // push.lb 0 == push.lb0
+    return op.toString(16) + (arg == null ? '' : ':' + arg); });
+}
+// max stack depth reached from the entry (args already on the stack), for the header's stack size
+function maxDepth(vm, code, args) {
+  const ins = decodeBytes(code), by = new Map(ins.map(i => [i.pc, i])), sigs = new Map();
+  for (const i of ins) if (i.name === 'call' && !sigs.has(i.arg)) sigs.set(i.arg, vm.subSig(by, i.arg, sigs, 0));
+  let mx = args; const seen = new Set(), todo = [[0, args]];
+  while (todo.length) {
+    const [pc, d0] = todo.pop(), key = pc + ':' + d0; if (seen.has(key) || !by.has(pc) || seen.size > 20000) continue; seen.add(key);
+    const i = by.get(pc); let d = d0;
+    if (i.name === 'call') { const sg = sigs.get(i.arg); todo.push([i.arg, d]); d = sg ? d - sg[0] + sg[1] : d; }
+    else { const [po, pu] = vm.effect(i, sigs); d = d - po + pu; }
+    mx = Math.max(mx, d, d0 + (i.name === 'native' ? 0 : 0));
+    if (i.name === 'ret' || i.name === 'end' || i.name === 'halt') continue;
+    if (i.name === 'jz' || i.name === 'jnz' || i.name === 'jmp') todo.push([i.arg, d]);
+    if (i.name !== 'jmp') todo.push([pc + i.len, d]);
+  }
+  return mx;
+}
+
+
+// ------------------------------------------------------------ writing scripts into a ROM
+// An edited script goes back to its own place when it fits (up to the next script); otherwise into a pool in banks
+// $AC-$AE: 'SRSCR' 1 at $AC:8000, count word $AC:8006, registry from $AC:8010 (9 bytes each: id word, original
+// address 3, original room word, current length word), script bodies from $AC:A200. The directory ($82D970 bank,
+// $82DD18 address, $82E810 argument bytes, $82E468 returns flag) is repointed. Scripts never cross a bank.
+const POOL_FIRST = 0xAC, POOL_LAST = 0xAE, REG = 0xAC8000, BODY = 0xACB400;
+// hook code for the new scripts: X = script id at all three places (16-bit A/X/Y). Ids outside $400..$400+count
+// run the original bytes (vanilla table reads, or the Runner Pack's JSL, turned into a JML).
+function newHookCode(origs, org) {
+  const b = [], at = [], fix = [];
+  const tail = o => { if (o[0] === 0x22) b.push(0x5C, o[1], o[2], o[3]); else { b.push(...o); b.push(0x6B); } };
+  const long = (op, v) => b.push(op, v & 0xFF, (v >> 8) & 0xFF, v >> 16);
+  const head = () => { b.push(0xDA, 0x8A, 0x38, 0xE9, NEW_BASE & 0xFF, NEW_BASE >> 8, 0x90, 0); const j1 = b.length - 1;   // phx; txa; sec; sbc #$400; bcc orig
+    long(0xCF, NEWHDR + 6); b.push(0xB0, 0); const j2 = b.length - 1;                                                      // cmp count; bcs orig
+    b.push(0x48, 0x0A, 0x0A, 0x0A, 0x38, 0xE3, 0x01, 0xAA, 0x68); return [j1, j2]; };                                       // X = 7k
+  const land = js => { for (const j of js) b[j] = b.length - j - 1; };
+  // 0: directory ($80C298): $71 address, $73 bank, $0264 argument bytes, X = 2*id
+  at.push(b.length); let js = head();
+  long(0xBF, NEWTAB); b.push(0x85, 0x71); long(0xBF, NEWTAB + 2); b.push(0x29, 0xFF, 0x00, 0x85, 0x73);
+  long(0xBF, NEWTAB + 3); b.push(0x29, 0xFF, 0x00, 0x8D, 0x64, 0x02, 0x68, 0x0A, 0xAA, 0x6B);
+  land(js); b.push(0xFA); tail(origs[0]);
+  // 1 and 2: argument bytes ($80F433) / returns flag ($80F473): A and the zero flag from AND #$00FF
+  for (const [k, off] of [[1, 3], [2, 4]]) {
+    at.push(b.length); js = head(); long(0xBF, NEWTAB + off); b.push(0xFA, 0x29, 0xFF, 0x00, 0x6B);
+    land(js); b.push(0xFA); tail(origs[k]);
+  }
+  for (const j of [...b.keys()]) if (b[j] > 0xFF) throw new Error('hook');
+  return { code: Uint8Array.from(b), entry: at.map(x => org + x) };
+}
+function applyScripts(romU8, edits, opts) {
+  let out = new Uint8Array(romU8); const vm = new VM(romU8), report = [];
+  const sig = romU8.length >= 0x200000 && String.fromCharCode(...romU8.slice(L(REG), L(REG) + 5)) === 'SRSCR';
+  const moved = new Map();
+  if (sig) { const n = vm.w(REG + 6); for (let k = 0; k < n; k++) { const e = REG + 0x10 + 9 * k;
+    moved.set(vm.w(e), { orig: vm.w(e + 2) | (vm.b(e + 4) << 16), room: vm.w(e + 5), cur: vm.scriptAddr(vm.w(e)), len: vm.w(e + 7) }); } }
+  // room of every script in its original place: up to the next script in the same bank
+  const starts = []; for (let id = 0; id < NSCR; id++) starts.push(moved.has(id) ? moved.get(id).orig : vm.scriptAddr(id));
+  const sorted = [...new Set(starts)].sort((a, b) => a - b);
+  const roomOf = (id, a) => {
+    if (moved.has(id)) return moved.get(id).room;
+    const nxt = sorted.find(s => s > a && (s >> 16) === (a >> 16));
+    if (nxt != null) return nxt - a;
+    const ins = vm.decode(id); return 2 + Math.max(...ins.map(i => i.pc + i.len));
+  };
+  const setDir = (id, a) => { out[L(0x82D970 + id)] = a >> 16; out[L(0x82DD18 + 2 * id)] = a & 0xFF; out[L(0x82DD18 + 2 * id) + 1] = (a >> 8) & 0xFF; };
+  const pool = new Map();
+  for (const [id, m] of moved) if (!edits.has(id)) pool.set(id, { orig: m.orig, room: m.room, bytes: romU8.slice(L(m.cur), L(m.cur) + m.len) });
+  // new scripts: the ones already in the ROM, then this export's (null = delete)
+  const fresh = new Map();
+  for (const [id, n] of vm.newDir) fresh.set(id, { args: n.args, ret: n.ret, bytes: romU8.slice(L(n.addr), L(n.addr) + n.len) });
+  for (const [id, s] of edits) {
+    if (id >= NEW_BASE && id < NEW_BASE + NEW_MAX) {
+      if (!s) { fresh.delete(id); report.push({ id, where: 'deleted' }); continue; }
+      const bytes = new Uint8Array(2 + s.code.length); bytes[0] = s.locals; bytes[1] = s.stack; bytes.set(s.code, 2);
+      fresh.set(id, { args: s.args, ret: s.ret, bytes }); report.push({ id, where: 'new', size: bytes.length }); continue;
+    }
+    if (id < 0 || id >= NSCR) throw new Error('script ' + hex(id, 3) + ' is outside the directory (new scripts are numbered from $400)');
+    const bytes = new Uint8Array(2 + s.code.length); bytes[0] = s.locals; bytes[1] = s.stack; bytes.set(s.code, 2);
+    const orig = moved.has(id) ? moved.get(id).orig : vm.scriptAddr(id), room = roomOf(id, orig);
+    if (bytes.length <= room && !(opts && opts.forceMove)) { out.set(bytes, L(orig)); setDir(id, orig); report.push({ id, where: 'in place', size: bytes.length, room }); }
+    else { pool.set(id, { orig, room, bytes }); report.push({ id, where: 'moved', size: bytes.length, room }); }
+    out[L(0x82E810 + id)] = 2 * s.args; out[L(0x82E468 + id)] = s.ret ? 2 : 0;
+  }
+  const count = fresh.size ? Math.max(...fresh.keys()) - NEW_BASE + 1 : 0;
+  for (let k = 0; k < count; k++) if (!fresh.has(NEW_BASE + k)) throw new Error('new scripts must be numbered without gaps: $' + (NEW_BASE + k).toString(16).toUpperCase() + ' is missing');
+  const hadNew = romU8.length >= 0x200000 && String.fromCharCode(...romU8.slice(L(NEWHDR), L(NEWHDR) + 5)) === 'SRNEW';
+  // original bytes at the three hooked places (kept in the header so that a re-export can restore or re-chain them)
+  const origs = HOOKS.map(([a, n], k) => hadNew ? romU8.slice(L(NEWHDR + [0x10, 0x30, 0x38][k]), L(NEWHDR + [0x10, 0x30, 0x38][k]) + n) : romU8.slice(L(a), L(a) + n));
+  if (pool.size || sig || fresh.size || hadNew) {
+    if (out.length < 0x200000) { const big = new Uint8Array(0x200000); big.set(out); out = big; out[0x7FD7] = 0x0B; }
+    for (let bk = POOL_FIRST; bk <= POOL_LAST; bk++) out.fill(0, L((bk << 16) | 0x8000), L((bk << 16) | 0x8000) + 0x8000);
+    out.set([0x53, 0x52, 0x53, 0x43, 0x52, 1], L(REG)); out[L(REG + 6)] = pool.size & 0xFF; out[L(REG + 7)] = pool.size >> 8;
+    if (pool.size > (0x2200 - 0x10) / 9) throw new Error('too many moved scripts');
+    let bank = BODY >> 16, addr = BODY & 0xFFFF, k = 0;
+    const place = bytes => { if (addr + bytes.length > 0x10000) { bank++; addr = 0x8000; } if (bank > POOL_LAST) throw new Error('script pool full');
+      const a = (bank << 16) | addr; out.set(bytes, L(a)); addr += bytes.length; return a; };
+    for (const [id, p] of [...pool].sort((a, b) => a[0] - b[0])) {
+      const a = place(p.bytes); setDir(id, a);
+      const e = L(REG + 0x10 + 9 * k++); out.set([id & 0xFF, id >> 8, p.orig & 0xFF, (p.orig >> 8) & 0xFF, p.orig >> 16, p.room & 0xFF, p.room >> 8, p.bytes.length & 0xFF, p.bytes.length >> 8], e);
+      const r = report.find(x => x.id === id && x.where === 'moved'); if (r) r.addr = a;
+    }
+    if (count) {
+      out.set([0x53, 0x52, 0x4E, 0x45, 0x57, 1, count & 0xFF, count >> 8], L(NEWHDR));
+      origs.forEach((o, i) => out.set(o, L(NEWHDR + [0x10, 0x30, 0x38][i])));
+      for (let i = 0; i < count; i++) { const f = fresh.get(NEW_BASE + i), a = place(f.bytes);
+        out.set([a & 0xFF, (a >> 8) & 0xFF, a >> 16, 2 * f.args, f.ret ? 2 : 0, f.bytes.length & 0xFF, f.bytes.length >> 8], L(NEWTAB + 7 * i));
+        const r = report.find(x => x.id === NEW_BASE + i && x.where === 'new'); if (r) r.addr = a; }
+      const { code, entry } = newHookCode(origs.map(o => [...o]), NEWCODE);
+      if (NEWCODE + code.length > NEWTAB) throw new Error('hook code too long');
+      out.set(code, L(NEWCODE));
+      HOOKS.forEach(([a, n], i) => { const p = L(a), t = entry[i]; out.set([0x22, t & 0xFF, (t >> 8) & 0xFF, t >> 16], p); for (let j = 4; j < n; j++) out[p + j] = 0xEA; });
+    } else if (hadNew) HOOKS.forEach(([a], i) => out.set(origs[i], L(a)));   // last new script deleted: put the old bytes back
+  }
+  return { rom: out, report };
+}
+// compile source to what applyScripts needs; header sizes are never made smaller than the original's
+function build(vm, src, id) {
+  const C = new Compiler(vm), r = C.compile(src);
+  const h = r.header; if (h.id != null && id != null && h.id !== id) throw new CompileError('this text says script ' + hex(h.id, 3) + ' at the top', 1);
+  const sid = id != null ? id : h.id; const [o0, o1] = vm.inRom(sid) ? vm.header(sid) : [0, 0];
+  // stack size: keep the original unless the new code goes deeper than the old one did (same estimate on both;
+  // changing the size changes thread memory layout, so unchanged scripts must keep it exactly)
+  let stack = o1;
+  if (vm.inRom(sid)) { const a = vm.scriptAddr(sid) + 2, ins = vm.decode(sid), end = Math.max(...ins.map(i => i.pc + i.len));
+    const old = maxDepth(vm, vm.u8.slice(L(a), L(a) + end), vm.scriptArgs(sid)), now = maxDepth(vm, r.code, h.args);
+    if (now > old) stack = o1 + 2 * (now - old); }
+  else stack = 2 * maxDepth(vm, r.code, h.args) + 4;
+  if (h.stack) stack = Math.max(stack, h.stack);
+  return { id: sid, code: r.code, args: h.args, ret: h.ret, locals: Math.max(o0, r.locals, h.locals || 0), stack };
+}
+
+const api = { applyScripts, build, VM, NEW_BASE, NEW_MAX, Compiler, CompileError, decodeBytes, normalise, maxDepth, NATIVES, NATIVE_ID, OPS, NSCR, L, hex };
+if (typeof module !== 'undefined') module.exports = api; else root.SV = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script type="application/json" id="smeta">{"meta":{"0":["",[],2],"1":["Hitman",["Hitman"],1],"2":["conversation 113 topic script",["Hiring"],1],"3":["Street Scum",["Street Scum"],1],"4":["DF_BADNEWS",["DF_BADNEWS"],1],"5":["helper",[],1],"6":["Automatic Door",["Automatic Door"],3],"7":["Person, A Busy Man",["Person","A Busy Man"],4],"8":["Street kid",["Street kid"],1],"9":["Door",["Door"],1],"10":["helper",[],1],"11":["combatant",[],1],"12":["helper",[],1],"13":["A waitress",["A waitress"],1],"14":["Kitsune",["Kitsune"],1],"15":["shows: \"I can see you!\"",[],1],"16":["Samurai Warrior",["Samurai Warrior"],1],"17":["weapon item: Strength check + equip",[],1],"18":["Me",["Me"],2],"19":["Samurai Warrior",["Samurai Warrior"],1],"20":["",[],13],"21":["",[],0],"22":["Poison Ooze",["Poison Ooze"],2],"23":["Samurai Warrior",["Samurai Warrior"],1],"24":["Samurai Warrior",["Samurai Warrior"],1],"25":["Samurai Warrior",["Samurai Warrior"],1],"26":["",[],1],"27":["Well dressed...",["Well dressed..."],1],"28":["Samurai Warrior",["Samurai Warrior"],1],"29":["Samurai Warrior",["Samurai Warrior"],1],"30":["Samurai Warrior",["Samurai Warrior"],1],"31":["T-250 Shotgun",["T-250 Shotgun"],3],"32":["conversation 100 topic script",["Hiring"],1],"33":["Gang Member",["Gang Member"],1],"34":["",[],0],"35":["Samurai Warrior",["Samurai Warrior"],1],"36":["Gang member",["Gang member"],1],"37":["Helicopter Pilot",["Helicopter Pilot"],1],"38":["ending/dream scene picker (var 44)",[],1],"39":["Gang Leader",["Gang Leader"],1],"40":["Samurai Warrior",["Samurai Warrior"],1],"41":["Gang member",["Gang member"],1],"42":["DF_DS-PUSHKIN",["DF_DS-PUSHKIN"],1],"43":["shows: \"Next Stop:\"",[],1],"44":["Mage",["Mage"],5],"45":["Samurai Warrior",["Samurai Warrior"],1],"46":["Jester Spirit",["Jester Spirit"],2],"47":["helper",[],1],"48":["Anders",["Anders"],1],"49":["Water Fountain, Lonely Gal, Larry On Guitar +7",["Water Fountain","Lonely Gal","Larry On Guitar","Keyboardist","Johnny-The drummer","Gavan-The guitarist"],30],"50":["Samurai Warrior",["Samurai Warrior"],1],"51":["Samurai Warrior",["Samurai Warrior"],1],"52":["Ghoul",["Ghoul"],2],"53":["Samurai Warrior",["Samurai Warrior"],1],"54":["Samurai Warrior",["Samurai Warrior"],1],"55":["",[],0],"56":["The King",["The King"],1],"57":["Samurai Warrior",["Samurai Warrior"],1],"58":["Switch",["Switch"],4],"59":["Gang member",["Gang member"],1],"60":["Slap Patch",["Slap Patch"],1],"61":["Mage",["Mage"],1],"62":["Jester Spirit",["Jester Spirit"],3],"63":["hire price block",[],1],"64":["Samurai Warrior",["Samurai Warrior"],1],"65":["",[],5],"66":["Mortician",["Mortician"],1],"67":["Gang member",["Gang member"],1],"68":["helper",["object created by script $19F with sprite $100"],2],"69":["Jake fires (cut-scene)",[],1],"70":["conversation 117 topic script",["Hiring"],1],"71":["",[],0],"72":["",[],1],"73":["",[],1],"74":["",[],1],"75":["helper",[],1],"76":["shows: \"This cabinet is locked.\"",[],1],"77":["conversation 16 topic script",["Lone Star"],2],"78":["Ferocious Orc",["Ferocious Orc"],4],"79":["",[],4],"80":["Dwarf",["Dwarf"],1],"81":["Switch",["Switch"],1],"82":["Hitman",["Hitman"],7],"83":["",[],1],"84":["",[],5],"85":["",[],0],"86":["",[],0],"87":["Stake",["Stake"],1],"88":["Torn Paper",["Torn Paper"],1],"89":["Iced Tea",["Iced Tea"],1],"90":["",[],0],"91":["Mage",["Mage"],13],"92":["Gang Leader",["Gang Leader"],1],"93":["Broken Bottle",["Broken Bottle"],1],"94":["Dwarf",["Dwarf"],1],"95":["",[],0],"96":["area init (resets enemy count)",[],35],"97":["Gang Leader",["Gang Leader"],1],"98":["",[],0],"99":["",[],0],"100":["Cruel man",["Cruel man"],1],"101":["",[],12],"102":["",[],0],"103":["JAKE",["JAKE"],2],"104":["helper",[],1],"105":["",[],0],"106":["",[],0],"107":["Peephole",["Peephole"],3],"108":["guard",["Ghoul"],6],"109":["Hotel Manager",["Hotel Manager"],1],"110":["shows: \"Too far away.\"",[],1],"111":["helper",[],1],"112":["",[],0],"113":["Peephole",["Peephole"],5],"114":["Rat Shaman",["Rat Shaman"],2],"115":["Password",["Password"],1],"116":["helper",[],1],"117":["Mage",["Mage"],1],"118":["combatant",[],1],"119":["",[],0],"120":["",[],0],"121":["",[],4],"122":["generic enemy AI",[],1],"123":["conversation 35 topic script",["Cortex Bomb"],1],"124":["armor item",[],1],"125":["helper",["object created by script $02B with sprite $110"],2],"126":["random enemy appears? (roll + area cap)",[],1],"127":["conversation 27 topic script",["Magic Fetish"],1],"128":["",[],0],"129":["conversation 29 topic script",["Head Computer"],1],"130":["",[],1],"131":["combatant",[],1],"132":["Jamaican",["Jamaican"],1],"133":["helper",[],1],"134":["conversation 42 topic script",["conversation 42, topic Talk"],1],"135":["Bulletin Board",["Bulletin Board"],1],"136":["Gang member",["Gang member"],1],"137":["helper",[],1],"138":["",[],0],"139":["helper",[],1],"140":["",[],1],"141":["Ghoul",["Ghoul"],3],"142":["helper",[],1],"143":["",[],1],"144":["body",["body"],4],"145":["",[],1],"146":["Loyal citizen",["Loyal citizen"],2],"147":["helper",[],1],"148":["Secretary",["Secretary"],1],"149":["conversation 133 topic script",["Magic Fetish"],1],"150":["Spatter",["Spatter"],1],"151":["ending roll call",[],1],"152":["conversation 106 topic script",["Hiring"],1],"153":["helper",["object created by script $105 with sprite $E6","object created by script $1C6 with sprite $E6","object created by script $2E7 with sprite $E6"],4],"154":["Mage",["Mage"],1],"155":["Elevator Doors",["Elevator Doors"],7],"156":["Me",["Me"],2],"157":["shows: \"I will teach you the meaning of pain, fool!\"",[],1],"158":["Street Doc",["Street Doc"],1],"159":["Sniper",["Sniper"],3],"160":["generic enemy AI",[],1],"161":["Protected",["object created by script $022 with sprite $C3","object created by script $037 with sprite $C3","object created by script $267 with sprite $C3","object created by script $1EC with sprite $C4","object created by script $205 with sprite $C4","Protected"],12],"162":["shows: \"I will avenge you brother!\"",[],1],"163":["Ferocious Orc",["Ferocious Orc"],1],"164":["conversation 49 topic script",["Strobes"],1],"165":["Bulletproof Vest",["Bulletproof Vest"],2],"166":["Massive Orc, Ferocious Orc",["Massive Orc","Ferocious Orc"],3],"167":["helper",[],1],"168":["Wooden Door",["Wooden Door"],1],"169":["Dancing Hippie!",["Dancing Hippie!"],1],"170":["Viper H. Pistol",["Viper H. Pistol"],2],"171":["combatant",[],1],"172":["helper",[],1],"173":["Wooden Door, Glass doors, Fridge Door +1",["Wooden Door","Glass doors","Fridge Door","Door"],13],"174":["Fichetti L. Pistol, Dog Food",["Fichetti L. Pistol","Dog Food","object created by script $097","object created by script $097 with sprite $B0"],4],"175":["",[],1],"176":["Elevator Doors",["Elevator Doors"],6],"177":["Massive Orc",["Massive Orc"],2],"178":["helper",[],1],"179":["Naga",["Naga"],2],"180":["Gun Case",["Gun Case"],1],"181":["Hitman",["Hitman"],2],"182":["conversation 28 topic script",["Cortex Bomb"],1],"183":["",[],1],"184":["Elevator Doors",["Elevator Doors"],3],"185":["Gun Case",["Gun Case"],1],"186":["",[],0],"187":["ending scene step 3",[],1],"188":["Steelflight",["Steelflight"],1],"189":["Gun Case",["Gun Case"],1],"190":["floor zone",["floor zone (runs while Jake stands in it) at $04B"],1],"191":["Vampire!",["Vampire!"],2],"192":["Gun Case",["Gun Case"],1],"193":["Mono-Rail Car",["Mono-Rail Car"],1],"194":["Mono-Rail Car",["Mono-Rail Car"],1],"195":["conversation 92 topic script",["conversation 92, topic Talk"],1],"196":["street doc",["Street Doc"],1],"197":["Door",["Door"],1],"198":["",[],7],"199":["Gun Case",["Gun Case"],1],"200":["shows: \"Not enough money!\"",[],1],"201":["Gun Case",["Gun Case"],1],"202":["helper",[],1],"203":["Mono-Rail Car",["Mono-Rail Car"],1],"204":["Mono-Rail Car",["Mono-Rail Car"],1],"205":["Indian Shaman",["Indian Shaman"],1],"206":["Gun Case",["Gun Case"],1],"207":["Gun Case",["Gun Case"],1],"208":["Gun Case",["Gun Case"],1],"209":["shows: \"DATA FILE OBTAINED.\"",[],1],"210":["helper",[],14],"211":["conversation 110 topic script",["Hiring"],1],"212":["",[],1],"213":["Large orc",["Large orc"],1],"214":["Nuyen",["Nuyen"],1],"215":["conversation 0 topic script",["King"],3],"216":["Gang member",["Gang member"],1],"217":["DF_MT-AI",["DF_MT-AI"],1],"218":["DF_DB-Jester",["DF_DB-Jester"],1],"219":["helper",[],3],"220":["Peephole",["Peephole"],8],"221":["Scientist",["Scientist"],4],"222":["Scientist",["Scientist"],1],"223":["",[],0],"224":["Massive Orc",["Massive Orc"],9],"225":["DF_DR-VOLCANO",["DF_DR-VOLCANO"],1],"226":["Wooden Door",["Wooden Door"],7],"227":["conversation 63 topic script",["Drake"],1],"228":["",[],0],"229":["Secretary",["Secretary"],1],"230":["Pool of Ink",["Pool of Ink"],1],"231":["Cyberdeck",["Cyberdeck"],1],"232":["Filing Cabinet",["Filing Cabinet"],1],"233":["",[],0],"234":["Automatic Door",["Automatic Door"],2],"235":["Bed",["Bed"],1],"236":["",[],0],"237":["shows: \"Sputnik Club\"",[],1],"238":["shows: \"Hey! You!\"",[],1],"239":["shows: \"I can see you!\"",[],1],"240":["helper",["object created by script $385 with sprite $56"],2],"241":["Naga",["Naga"],2],"242":["Iron Key",["Iron Key"],1],"243":["talks: \"Hey plughead! Yeah you! Get over 'ere... I wanna...\"",[],1],"244":["street doc cyberware shelf",["Skill Software","Dermal Plating","Boosted Reflexes"],3],"245":["combatant",["object created by script $210 with sprite $C3"],2],"246":["A Busy Man",["A Busy Man"],4],"247":["Automatic Door",["Automatic Door"],33],"248":["conversation 29 topic script",["Cyberware"],2],"249":["save game",[],1],"250":["",[],0],"251":["generic enemy AI",[],1],"252":["shows: \"ELEVATOR ACTIVATED.\"",[],1],"253":["",[],0],"254":["shows: \"DATA FILE OBTAINED.\"",[],1],"255":["helper",[],1],"256":["A Busy Man",["A Busy Man"],1],"257":["helper",[],1],"258":["Decker",["Decker"],1],"259":["helper",[],1],"260":["helper",["object created by script $00B with sprite $DC","object created by script $0B3 with sprite $DC"],3],"261":["AI Computer",["AI Computer"],1],"262":["Crypt Door",["Crypt Door"],3],"263":["Loyal citizen",["Loyal citizen"],1],"264":["Scientist",["Scientist"],1],"265":["",[],1],"266":["door to $0F1",["floor zone (runs while Jake stands in it) at $0F5, $0F6"],1],"267":["door to $1D1",["floor zone (runs while Jake stands in it) at $064, $065, $0CB, $0CC, $0DA"],1],"268":["generic enemy AI",[],1],"269":["generic enemy AI",[],1],"270":["shows: \"We will wait outside Jake.\"",[],1],"271":["",[],0],"272":["Club Manager",["Club Manager"],1],"273":["helper",[],1],"274":["door to $0F1",["floor zone (runs while Jake stands in it) at $05F, $060, $0CD, $0CE"],1],"275":["door to $1D1",["floor zone (runs while Jake stands in it) at $0DE, $0DF, $0E0"],1],"276":["Jester Spirit",["Jester Spirit"],2],"277":["Explosives",["Explosives"],1],"278":["Dog Food",["Dog Food"],1],"279":["Filing Cabinet",["Filing Cabinet"],1],"280":["arena offer yes/no",[],1],"281":["floor zone",["floor zone (runs while Jake stands in it) at $198, $199"],1],"282":["door to $0F1",["floor zone (runs while Jake stands in it) at $0E5, $0E6"],1],"283":["door to $1D1",["floor zone (runs while Jake stands in it) at $0FD, $0FE, $0FF, $100"],1],"284":["Computer",["Computer"],1],"285":["shows: \"Winter CES'93 Las Vegas - Warp!\"",[],0],"286":["conversation 129 topic script",["Talismans","Shaman"],1],"287":["DF_DS-AKIMI",["DF_DS-AKIMI"],1],"288":["Cyberdeck",["Cyberdeck"],1],"289":["Computer",["Computer"],1],"290":["door to $0F1",["floor zone (runs while Jake stands in it) at $10C, $10D"],1],"291":["door to $1D1",["floor zone (runs while Jake stands in it) at $09B, $11B, $11C"],1],"292":["Bronze Gate",["Bronze Gate"],3],"293":["Giant Rat",["Giant Rat"],11],"294":["Matchbox",["Matchbox"],1],"295":["Boat driver",["Boat driver"],1],"296":["Loyal citizen",["Loyal citizen"],1],"297":["Samurai Warrior, Massive Orc",["Samurai Warrior","Massive Orc"],3],"298":["helper",["object created by script $00C with sprite $10A","object created by script $1E9 with sprite $10A","object created by script $328 with sprite $10A"],4],"299":["A Busy Man",["A Busy Man"],1],"300":["Samurai Warrior",["Samurai Warrior"],1],"301":["Jester Spirit",["Jester Spirit"],2],"302":["Ferocious Orc",["Ferocious Orc"],1],"303":["Jester Spirit",["Jester Spirit"],2],"304":["Bystander",["Bystander"],1],"305":["Orc",["Orc"],1],"306":["A Busy Man",["A Busy Man"],1],"307":["Slab",["Slab"],1],"308":["arena King prize",["conversation 12, topic greeting"],1],"309":["Automatic Door",["Automatic Door"],1],"310":["Grenade",["Grenade"],2],"311":["shows: \"WARNING: 20 Seconds until detonation.\"",[],1],"312":["Safe Key",["Safe Key"],1],"313":["shows: \"Tenth Street Station.\"",[],1],"314":["conversation 88 topic script",["Ghouls"],1],"315":["Mono-Rail Car",["Mono-Rail Car"],1],"316":["Door",["Door"],7],"317":["shows: \"Oldtown Station.\"",[],2],"318":["shows: \"Oh look man, you come any closer and I blow ever...\"",[],1],"319":["shows: \"Daley Station.\"",[],1],"320":["Fridge Door",["Fridge Door"],4],"321":["Doggie",["Doggie"],1],"322":["Door",["Door"],1],"323":["conversation 125 topic script",["Street Doc"],1],"324":["Ferocious Orc",["Ferocious Orc"],1],"325":["",[],9],"326":["Wooden Door",["Wooden Door"],4],"327":["shows: \"This door is locked.\"",[],1],"328":["",[],5],"329":["helper",["object created by script $00E with sprite $56","object created by script $0EF with sprite $56","object created by script $15B with sprite $56"],4],"330":["conversation 35 topic script",["Cyberware"],1],"331":["Shopkeeper",["Shopkeeper"],1],"332":["Gun Case",["Gun Case"],1],"333":["weapon item (Jake only)",[],0],"334":["A Busy Man",["A Busy Man"],1],"335":["",[],15],"336":["door to $095",["floor zone (runs while Jake stands in it) at $08A, $08B"],1],"337":["door to $08B",["floor zone (runs while Jake stands in it) at $094, $095, $18E"],1],"338":["body",["body"],2],"339":["conversation 31 topic script",["conversation 31, topic Talk"],1],"340":["",[],1],"341":["",[],1],"342":["door to $003",[],0],"343":["combatant",[],1],"344":["door to $020",["floor zone (runs while Jake stands in it) at $18C, $18D"],1],"345":["door to $18D",["floor zone (runs while Jake stands in it) at $020, $02A"],1],"346":["conversation 71 topic script",["Calls","Glutman"],1],"347":["Mage",["Mage"],2],"348":["Nuyen",["Nuyen"],2],"349":["Drake",["Drake"],1],"350":["Nuyen",["Nuyen"],2],"351":["Nuyen",["Nuyen"],2],"352":["helper",["object created by script $0B3 with sprite $DC","object created by script $0EF with sprite $DC","object created by script $10D with sprite $DC","object created by script $398 with sprite $DC"],5],"353":["shows: \"Wastelands.........\"",[],1],"354":["hire runner",[],1],"355":["Toxic Water",["Toxic Water"],1],"356":["Nuyen",["Nuyen"],2],"357":["shows: \"It looks similar to a light switch.\"",[],1],"358":["Door",["Door"],1],"359":["guard",["Bubbles"],3],"360":["combatant",[],5],"361":["Street Scum, Street scum, Slum dweller",["Street Scum","Street scum","Slum dweller"],3],"362":["conversation 47 topic script",["Bremerton"],1],"363":["floor zone",["floor zone (runs while Jake stands in it) at $14D, $14E"],1],"364":["HK 277 A. Rifle",["HK 277 A. Rifle"],2],"365":["door to $08B",[],0],"366":["Kitsune",["Kitsune"],1],"367":["Bubbles",["Bubbles"],4],"368":["Automatic Door",["Automatic Door"],2],"369":["door to $07A",["floor zone (runs while Jake stands in it) at $085, $087"],1],"370":["Orifice",["Orifice"],1],"371":["Troll Decker",["Troll Decker"],1],"372":["combatant",[],1],"373":["",[],0],"374":["Troll Decker",["Troll Decker"],1],"375":["Dancing Hippie!",["Dancing Hippie!"],1],"376":["Troll Decker",["Troll Decker"],1],"377":["helper",[],1],"378":["Wooden Door",["Wooden Door"],1],"379":["Troll Decker",["Troll Decker"],1],"380":["Troll Decker",["Troll Decker"],1],"381":["Wooden Door",["Wooden Door"],1],"382":["Troll Decker",["Troll Decker"],1],"383":["Serpent Scales",["Serpent Scales"],1],"384":["floor zone",["floor zone (runs while Jake stands in it) at $0C3, $0C4, $0DD, $1AD, $1AE, $1AF,"],1],"385":["conversation 104 topic script",["Hiring"],1],"386":["conversation 23 topic script",["Cortex Bomb"],1],"387":["shows: \"This isn't the end, Armitage!\"",[],1],"388":["Me",["Me"],2],"389":["Slimy toxic waste",["Slimy toxic waste"],1],"390":["Mono-Rail Car",["Mono-Rail Car"],1],"391":["Mono-Rail Car",["Mono-Rail Car"],1],"392":["Naga",["Naga"],1],"393":["",[],2],"394":["guard",["Ghoul"],11],"395":["shows: \"Jagged Nails.......\"",[],1],"396":["A waitress",["A waitress"],1],"397":["shows: \"Where are you taking me? And why did you have to...\"",[],1],"398":["Gang Leader",["Gang Leader"],1],"399":["",[],2],"400":["Indian Shaman",["Indian Shaman"],1],"401":["Mono-Rail Car",["Mono-Rail Car"],1],"402":["Mono-Rail Car",["Mono-Rail Car"],1],"403":["Shades",["Shades"],1],"404":["runner leaves the party",[],1],"405":["combatant",[],1],"406":["Giant Rat",["Giant Rat"],8],"407":["helper",[],1],"408":["Giant Rat",["Giant Rat"],5],"409":["Heavy Bouncer",["Heavy Bouncer"],1],"410":["conversation 102 topic script",["Hiring"],1],"411":["Hamfist",["Hamfist"],1],"412":["Concealed Jacket",["Concealed Jacket"],1],"413":["Computer",["Computer"],7],"414":["Jester Spirit",["Jester Spirit"],2],"415":["Drake",["Drake"],2],"416":["helper",[],1],"417":["Door",["Door"],1],"418":["helper",[],1],"419":["conversation 28 topic script",["Heal"],3],"420":["Sniper",["Sniper"],5],"421":["",[],1],"422":["Glass Door",["Glass Door"],1],"423":["Uzi III SMG",["Uzi III SMG"],2],"424":["Mesh Jacket",["Mesh Jacket"],2],"425":["helper",["object created by script $366 with sprite $91"],2],"426":["Troll Decker",["Troll Decker"],1],"427":["Coffin Lid",["Coffin Lid"],6],"428":["Cruel man",["Cruel man"],1],"429":["runner AI",[],1],"430":["Troll Decker",["Troll Decker"],1],"431":["Troll Decker",["Troll Decker"],1],"432":["helper",["object created by script $19F with sprite $8D"],2],"433":["helper",[],1],"434":["Wooden Door",["Wooden Door"],1],"435":["JAKE",["JAKE"],1],"436":["helper",[],1],"437":["conversation 123 topic script",["Hiring"],1],"438":["Poison Ooze",["Poison Ooze"],1],"439":["floor zone",["floor zone (runs while Jake stands in it) at $0A9, $0C6, $150, $1BD, $1BE"],1],"440":["Sentry Gun",["Sentry Gun"],2],"441":["Troll Decker",["Troll Decker"],1],"442":["helper",[],1],"443":["Magic Fetish",["Magic Fetish"],1],"444":["helper",[],1],"445":["conversation 72 topic script",["conversation 72, topic greeting"],1],"446":["Full Bodysuit",["Full Bodysuit"],1],"447":["Beretta Pistol",["Beretta Pistol"],1],"448":["Bed",["Bed"],1],"449":["Club Manager",["Club Manager"],1],"450":["enemy AI helper",[],1],"451":["Giant Rat",["Giant Rat"],3],"452":["floor zone",["floor zone (runs while Jake stands in it) at $0BB, $0BC"],1],"453":["Bed",["Bed"],1],"454":["Video Phone",["Video Phone"],1],"455":["helper",[],1],"456":["",[],0],"457":["shows: \"Tell me Jake, did you guess or did you know?\"",[],1],"458":["helper",["object created by script $09E with sprite $95"],2],"459":["Bed",["Bed"],1],"460":["Maria Mercurial",["Maria Mercurial"],1],"461":["helper",[],1],"462":["Mage",["Mage"],2],"463":["",[],5],"464":["Dog Collar",["Dog Collar"],1],"465":["helper",[],1],"466":["",[],4],"467":["Leaves",["Leaves"],1],"468":["sleep (bed) -> rest menu",[],1],"469":["Orc",["Orc"],1],"470":["Street kid",["Street kid"],1],"471":["Elevator Door",["Elevator Door"],1],"472":["Troll Decker",["Troll Decker"],1],"473":["Jake's control script",["Jake"],1],"474":["conversation 89 topic script",["Magic Fetish"],1],"475":["Ferocious Orc",["Ferocious Orc"],1],"476":["Automatic Door",["Automatic Door"],5],"477":["Mage",["Mage"],7],"478":["",[],8],"479":["DF_DR-MATRIX",["DF_DR-MATRIX"],1],"480":["Strobe",["Strobe"],1],"481":["conversation 48 topic script",["Volcano"],1],"482":["",[],0],"483":["conversation 16 topic script",["conversation 16, topic greeting","conversation 21, topic greeting","conversation 26, topic greeting"],3],"484":["arena manager",["Arena owner"],1],"485":["shows: \"We could not allow you to escape. We HAD to stop...\"",[],1],"486":["conversation 22 topic script",["Examination"],1],"487":["DF_DS-TARGET",["DF_DS-TARGET"],1],"488":["helper",["object created by script $274 with sprite $EB"],2],"489":["runner AI",["Kitsune"],1],"490":["Elevator Doors",["Elevator Doors"],4],"491":["Troll Decker",["Troll Decker"],1],"492":["",[],0],"493":["conversation 80 topic script",["Grinder"],1],"494":["Ghoul Bone",["Ghoul Bone","object created by script $0F5 with sprite $100"],6],"495":["conversation 1 topic script",["conversation 1, topic Talk","conversation 1, topic default answer"],2],"496":["Naga",["Naga"],1],"497":["shows: \"Oh wow, this should be fun.\"",[],1],"498":["Troll Decker",["Troll Decker"],1],"499":["",[],0],"500":["Gang member",["Gang member"],1],"501":["Naga",["Naga"],1],"502":["Jester Spirit",["Jester Spirit"],1],"503":["Dog spirit",["Dog spirit"],1],"504":["Doggie",["Doggie"],1],"505":["The King",["The King"],1],"506":["Naga",["Naga"],1],"507":["shows: \"Throw at:\"",[],1],"508":["",[],0],"509":["Street dweller",["Street dweller"],1],"510":["conversation 97 topic script",["Heal"],1],"511":["conversation 121 topic script",["Hiring"],1],"512":["Ghoul Bone",["Ghoul Bone"],1],"513":["shows: \"Hey! You!\"",[],0],"514":["Troll Decker",["Troll Decker"],1],"515":["Elevator Doors",["Elevator Doors"],4],"516":["Street kid",["Street kid"],1],"517":["",[],0],"518":["Video Phone",["Video Phone"],4],"519":["Scary Ghoul",["Scary Ghoul"],3],"520":["Street scum",["Street scum"],1],"521":["helper",[],1],"522":["Akimi",["Akimi"],1],"523":["Gang member, Gang Member",["Gang member","Gang Member"],4],"524":["",[],0],"525":["guard",["Scary Ghoul","Ghoul"],11],"526":["Gang Leader",["Gang Leader"],1],"527":["shows: \"Hey look buddy, I haven't got time at the moment...\"",[],0],"528":["helper",["object created by script $044 with sprite $100"],2],"529":["",[],0],"530":["shows: \"Hey look buddy, I haven't got time at the moment...\"",[],0],"531":["Switch",["Switch"],1],"532":["Broken Gate",["Broken Gate"],1],"533":["Mono-Rail Car",["Mono-Rail Car"],1],"534":["shows: \"Hey look buddy, I haven't got time at the moment...\"",[],0],"535":["Grenade",["Grenade"],2],"536":["Zip-Gun",["Zip-Gun"],1],"537":["",[],5],"538":["helper",["object created by script $105 with sprite $E6"],2],"539":["Doggie",["Doggie"],2],"540":["Hitman",["Hitman"],1],"541":["Time Bomb",["Time Bomb"],1],"542":["floor zone",["floor zone (runs while Jake stands in it) at $162, $163, $17D, $17E, $17F, $180,"],1],"543":["Gang member",["Gang member"],1],"544":["Sniper",["Sniper"],2],"545":["helper",[],1],"546":["A Busy Man",["A Busy Man"],2],"547":["floor zone",["floor zone (runs while Jake stands in it) at $164, $165, $166, $167, $16B, $16C,"],1],"548":["Stall Keeper",["Stall Keeper"],1],"549":["combatant",[],0],"550":["Bronze Key",["Bronze Key"],1],"551":["combatant",[],1],"552":["Massive Orc",["Massive Orc"],1],"553":["Mortician",["Mortician"],1],"554":["conversation 62 topic script",["Laughlyn"],1],"555":["Hitman",["Hitman"],3],"556":["Norbert",["Norbert"],1],"557":["",[],7],"558":["",[],2],"559":["helper",[],1],"560":["Poison Ooze",["Poison Ooze"],1],"561":["",[],1],"562":["Poison Ooze",["Poison Ooze"],1],"563":["shows: \"This is a healing patch.\"",[],0],"564":["",[],2],"565":["helper",[],1],"566":["Gang member",["Gang member"],1],"567":["Coffin Lid",["Coffin Lid"],2],"568":["Sentry Gun",["Sentry Gun"],2],"569":["",[],0],"570":["Ferocious Orc",["Ferocious Orc"],1],"571":["Cyberdeck",["Cyberdeck"],2],"572":["Scientist",["Scientist"],14],"573":["Slimy toxic waste",["Slimy toxic waste"],1],"574":["Computer",["Computer"],1],"575":["shows: \"Give to:\"",[],1],"576":["helper",[],1],"577":["helper",[],1],"578":["Computer",["Computer"],1],"579":["Computer",["Computer"],1],"580":["helper",[],1],"581":["Ripped Note",["Ripped Note"],1],"582":["floor zone",["floor zone (runs while Jake stands in it) at $018, $02D, $02E, $02F, $194, $195"],1],"583":["Nuyen",["Nuyen"],2],"584":["",[],7],"585":["Computer",["Computer"],1],"586":["Computer",["Computer"],1],"587":["Computer",["Computer"],1],"588":["Computer",["Computer"],1],"589":["Computer",["Computer"],1],"590":["Computer",["Computer"],1],"591":["Computer",["Computer"],1],"592":["helper",[],1],"593":["combatant",[],1],"594":["shows: \"Target:\"",[],1],"595":["Ferocious Orc",["Ferocious Orc"],1],"596":["Computer",["Computer"],1],"597":["Computer",["Computer"],1],"598":["Computer",["Computer"],1],"599":["Computer",["Computer"],1],"600":["Computer",["Computer"],1],"601":["shows: \"Hey, where do you think you're going?\"",[],0],"602":["helper",[],1],"603":["Ferocious Orc",["Ferocious Orc"],1],"604":["shows: \"This terminal is not accessible.\"",[],1],"605":["Computer",["Computer"],1],"606":["Computer",["Computer"],1],"607":["Computer",["Computer"],1],"608":["Computer",["Computer"],1],"609":["Scary Ghoul",["Scary Ghoul"],3],"610":["Gang member",["Gang member"],1],"611":["Ferocious Orc",["Ferocious Orc"],1],"612":["Computer",["Computer"],1],"613":["DF_DR 4-4, DF_DR 3-4, DF_DR 2-4 +1",["DF_DR 4-4","DF_DR 3-4","DF_DR 2-4","DF_DR 1-4"],1],"614":["Memo",["Memo"],1],"615":["helper",["object created by script $10D with sprite $100"],2],"616":["Mage",["Mage"],1],"617":["DF_AN-PAYMENT",["DF_AN-PAYMENT"],1],"618":["",[],2],"619":["armor item (Jake only)",[],0],"620":["shows: \"Too far away.\"",[],1],"621":["",[],0],"622":["",[],0],"623":["ending recap scene",[],1],"624":["Nuyen",["Nuyen"],2],"625":["Slimy toxic waste, Poison Ooze",["Slimy toxic waste","Poison Ooze"],2],"626":["DF_AN-ANTI-AI",["DF_AN-ANTI-AI"],1],"627":["",[],0],"628":["helper",[],1],"629":["helper",[],1],"630":["Door",["Door"],1],"631":["Mage",["Mage"],1],"632":["Mortician",["Mortician"],1],"633":["conversation 0 topic script",["Negotiation"],6],"634":["",[],0],"635":["generic enemy AI",[],1],"636":["Cruel man",["Cruel man"],1],"637":["Kitsune",["Kitsune"],2],"638":["Mage",["Mage"],1],"639":["helper",["object created by script $231 with sprite $79"],2],"640":["Mage",["Mage"],1],"641":["",[],0],"642":["body",["body"],1],"643":["",[],0],"644":["conversation 44 topic script",["Docks"],1],"645":["Computer",["Computer"],1],"646":["Fichetti L. Pistol",["Fichetti L. Pistol"],2],"647":["",[],0],"648":["",[],1],"649":["",[],1],"650":["shows: \"It turned out wrong for me, that's all!\"",[],1],"651":["helper",[],1],"652":["display-case shop item",[],1],"653":["combatant",[],1],"654":["Mage",["Mage"],1],"655":["",[],1],"656":["",[],1],"657":["Potion Bottles",["Potion Bottles"],1],"658":["helper",[],1],"659":["Door Key",["Door Key"],1],"660":["Mage",["Mage"],1],"661":["Wooden Door",["Wooden Door"],1],"662":["Paperweight",["Paperweight"],1],"663":["Mage",["Mage"],1],"664":["Wooden Door",["Wooden Door"],1],"665":["arena prize",["conversation 1, topic greeting"],1],"666":["Warhawk H. Pistol",["Warhawk H. Pistol"],2],"667":["Mage",["Mage"],1],"668":["Mage",["Mage"],1],"669":["Wooden Door",["Wooden Door"],1],"670":["helper",[],1],"671":["Mermaid Scales",["Mermaid Scales"],1],"672":["Wooden Door",["Wooden Door"],1],"673":["Cruel man",["Cruel man"],5],"674":["helper",[],1],"675":["Wooden Door",["Wooden Door"],1],"676":["Wooden Door",["Wooden Door"],1],"677":["helper",[],1],"678":["Mage",["Mage"],1],"679":["A Busy Man",["A Busy Man"],1],"680":["Wooden Door",["Wooden Door"],1],"681":["generic enemy AI",[],1],"682":["item menu (bed)",[],1],"683":["Credstick",["Credstick"],1],"684":["Frogtongue",["Frogtongue"],1],"685":["Mage",["Mage"],1],"686":["A Busy Man",["A Busy Man"],1],"687":["Wooden Door",["Wooden Door"],1],"688":["",[],8],"689":["shows: \"Jake is dead.\"",[],1],"690":["helper",["object created by script $385 with sprite $91"],2],"691":["Well dressed...",["Well dressed..."],1],"692":["Wooden Door, Glass doors, Door +1",["Wooden Door","Glass doors","Door","Bronze Gate"],10],"693":["A Busy Man",["A Busy Man"],1],"694":["Wooden Door",["Wooden Door"],1],"695":["",[],4],"696":["LoneStar Badge",["LoneStar Badge"],1],"697":["A Busy Man",["A Busy Man"],1],"698":["Partial Bodysuit",["Partial Bodysuit"],1],"699":["helper",[],1],"700":["A Busy Man",["A Busy Man"],1],"701":["helper",["object created by script $000 with sprite $55","object created by script $1CC with sprite $55","object created by script $000 with sprite $56"],4],"702":["",[],0],"703":["Hitman",["Hitman"],4],"704":["Mage",["Mage"],1],"705":["Decker",["Decker"],1],"706":["",[],0],"707":["",[],0],"708":["Crypt Door",["Crypt Door"],1],"709":["Decker",["Decker"],1],"710":["hmmm....",["hmmm...."],1],"711":["Grenade",["Grenade"],1],"712":["Troll Decker, Mage",["Troll Decker","Mage"],4],"713":["",[],0],"714":["Jangadance",["Jangadance"],1],"715":["She's choosing...",["She's choosing..."],1],"716":["street doc cyberware purchase",[],1],"717":["shows: \"Sub-level door program modified.\"",[],1],"718":["Massive Orc, Ferocious Orc",["Massive Orc","Ferocious Orc"],9],"719":["",[],1],"720":["arena fight offer",["conversation 0, topic Talk","conversation 0, topic default answer"],2],"721":["Massive Orc, Ferocious Orc",["Massive Orc","Ferocious Orc"],4],"722":["Mercenary",["Mercenary"],1],"723":["shows: \"The Cage.\"",[],1],"724":["shows: \"The door is secured by IC program.\"",[],1],"725":["Samurai Warrior",["Samurai Warrior"],4],"726":["Ferocious Orc",["Ferocious Orc"],1],"727":["Bulletin Board",["Bulletin Board"],1],"728":["",[],0],"729":["conversation 108 topic script",["Hiring"],1],"730":["Samurai Warrior",["Samurai Warrior"],1],"731":["Magic user",["Magic user"],1],"732":["Samurai Warrior",["Samurai Warrior"],1],"733":["Doggie",["Doggie"],1],"734":["Samurai Warrior",["Samurai Warrior"],1],"735":["Video Phone",["Video Phone"],1],"736":["Peephole",["Peephole"],12],"737":["A Busy Man",["A Busy Man"],1],"738":["Samurai Warrior",["Samurai Warrior"],1],"739":["Club Manager",["Club Manager"],1],"740":["Club Manager",["Club Manager"],1],"741":["",[],0],"742":["Wooden Door, Bronze Gate",["Wooden Door","Bronze Gate"],8],"743":["helper",[],1],"744":["conversation 43 topic script",["Ice"],1],"745":["Samurai Warrior",["Samurai Warrior"],1],"746":["shows: \"There is nobody here, but us... mice!\"",[],1],"747":["helper",[],1],"748":["shows: \"Don't hurt us! Keep away.\"",[],1],"749":["",[],1],"750":["Samurai Warrior",["Samurai Warrior"],1],"751":["Detonator",["Detonator"],1],"752":["Gun Case",["Gun Case"],1],"753":["combatant",[],1],"754":["helper",["object created by script $0C4 with sprite $95"],2],"755":["Samurai Warrior",["Samurai Warrior"],1],"756":["Samurai Warrior",["Samurai Warrior"],1],"757":["helper",["object created by script $18D with sprite $B1"],4],"758":["combatant",[],1],"759":["door to $15B",[],1],"760":["shows: \"ADIOS!\"",["floor zone (runs while Jake stands in it) at $0D2"],1],"761":["Ferocious Orc",["Ferocious Orc"],1],"762":["Gang Member",["Gang Member"],3],"763":["Club Manager",["Club Manager"],1],"764":["Samurai Warrior",["Samurai Warrior"],1],"765":["Samurai Warrior",["Samurai Warrior"],1],"766":["Business Man",["Business Man"],1],"767":["Scientist",["Scientist"],1],"768":["Orc",["Orc"],1],"769":["Gun Case",["Gun Case"],1],"770":["weapon item",[],1],"771":["Dancing Hippie!",["Dancing Hippie!"],1],"772":["Dog Tag",["Dog Tag"],1],"773":["Automatic Door",["Automatic Door"],25],"774":["helper",[],1],"775":["Gun Case",["Gun Case"],1],"776":["Scientist",["Scientist"],1],"777":["Switch",["Switch"],1],"778":["Samurai Warrior",["Samurai Warrior"],1],"779":["Seems familiar...",["Seems familiar..."],1],"780":["Gun Case",["Gun Case"],1],"781":["Scientist",["Scientist"],1],"782":["conversation 112 topic script",["Rust Stilettos"],1],"783":["Gun Case",["Gun Case"],1],"784":["Automatic Door",["Automatic Door"],2],"785":["helper",[],1],"786":["Samurai Warrior",["Samurai Warrior"],1],"787":["Gun Case",["Gun Case"],1],"788":["Slap Patch",["Slap Patch"],1],"789":["AS-7 A. Cannon",["AS-7 A. Cannon"],1],"790":["Gun Case",["Gun Case"],1],"791":["guard",["Bubbles"],2],"792":["Ferocious Orc",["Ferocious Orc"],1],"793":["",[],1],"794":["guard",["Scientist"],7],"795":["shows: \"TRASH DATA DISCARDED.\"",[],1],"796":["",[],1],"797":["Massive Orc",["Massive Orc"],1],"798":["helper",[],1],"799":["Little boy",["Little boy"],1],"800":["armor item: Strength check + equip",[],1],"801":["Hitman",["Hitman"],8],"802":["",[],0],"803":["Ferocious Orc",["Ferocious Orc"],1],"804":["",[],0],"805":["helper",["object created by script $18D with sprite $B0"],2],"806":["Massive Orc",["Massive Orc"],1],"807":["",[],0],"808":["runner AI (mages)",[],1],"809":["Safe",["Safe"],2],"810":["Bubbles",["Bubbles"],2],"811":["Ghoul",["Ghoul"],6],"812":["Ferocious Orc",["Ferocious Orc"],1],"813":["Filing Cabinet",["Filing Cabinet"],1],"814":["",[],0],"815":["floor zone",["floor zone (runs while Jake stands in it) at $00B, $00C, $014, $19A, $19B"],1],"816":["runner dismisses itself (heal, unhire)",[],1],"817":["Jester Spirit",["Jester Spirit"],3],"818":["door to $087",["floor zone (runs while Jake stands in it) at $07A, $07C, $07F, $080"],1],"819":["Samurai Warrior",["Samurai Warrior"],1],"820":["Massive Orc",["Massive Orc"],1],"821":["generic enemy AI",[],1],"822":["Mortician",["Mortician"],1],"823":["Happy Customer",["Happy Customer"],1],"824":["DF_DS-AI END",["DF_DS-AI END"],1],"825":["Massive Orc",["Massive Orc"],1],"826":["Orc",["Orc"],1],"827":["Scalpel",["Scalpel"],1],"828":["helper",[],1],"829":["conversation 129 topic script",["Dark Blade"],2],"830":["Massive Orc",["Massive Orc"],1],"831":["Customer",["Customer"],1],"832":["Talisman Case",["Talisman Case"],1],"833":["shows: \"The panel logo reads: D-G-C\"",[],1],"834":["Vladimir",["Vladimir"],1],"835":["conversation 37 topic script",["Rat"],1],"836":["shows: \"It's electronically sealed.\"",[],1],"837":["A waitress",["A waitress"],1],"838":["Street scum, Street kid, Street dweller +1",["Street scum","Street kid","Street dweller","Poor street dweller"],10],"839":["Customer",["Customer"],1],"840":["Talisman Case",["Talisman Case"],1],"841":["Black Bottle",["Black Bottle"],1],"842":["helper",["object created by script $2F6 with sprite $BB"],2],"843":["Samurai Warrior",["Samurai Warrior"],1],"844":["Ferocious Orc",["Ferocious Orc"],1],"845":["A waitress",["A waitress"],1],"846":["Talisman Case",["Talisman Case"],1],"847":["Colt L36 Pistol, Beretta Pistol",["Colt L36 Pistol","Beretta Pistol"],2],"848":["",[],1],"849":["shows: \"Grim Reaper Club.\"",[],1],"850":["A waitress",["A waitress"],1],"851":["conversation 119 topic script",["Hiring"],1],"852":["Leather Jacket",["Leather Jacket"],1],"853":["Massive Orc",["Massive Orc"],1],"854":["A waitress",["A waitress"],1],"855":["Club patron...",["Club patron..."],1],"856":["Me",["Me"],1],"857":["Massive Orc",["Massive Orc"],1],"858":["Ferocious Orc",["Ferocious Orc"],1],"859":["generic enemy AI",[],1],"860":["helper",[],1],"861":["A waitress",["A waitress"],1],"862":["Computer",["Computer"],1],"863":["helper",[],1],"864":["Mage",["Mage"],1],"865":["A waitress",["A waitress"],1],"866":["Video Phone",["Video Phone"],1],"867":["Computer",["Computer"],1],"868":["Computer",["Computer"],1],"869":["helper",[],1],"870":["Coffin Lid",["Coffin Lid"],8],"871":["",[],0],"872":["Computer",["Computer"],1],"873":["Computer",["Computer"],1],"874":["Computer",["Computer"],1],"875":["helper",[],1],"876":["helper",[],1],"877":["Scary Ghoul",["Scary Ghoul"],1],"878":["Computer",["Computer"],1],"879":["Octopus",["Octopus"],2],"880":["combatant",[],1],"881":["Mage",["Mage"],1],"882":["Computer",["Computer"],1],"883":["shows: \"Why do you run? I will not hurt you, Jake. You k...\"",[],1],"884":["Grenade",["Grenade"],1],"885":["Computer",["Computer"],1],"886":["",[],3],"887":["shows: \"This door is locked.\"",[],0],"888":["Computer",["Computer"],1],"889":["helper",["object created by script $105 with sprite $7A"],2],"890":["Crowbar",["Crowbar"],1],"891":["Mobile TV phone",["Mobile TV phone"],1],"892":["JAKE",["JAKE"],1],"893":["Glass Door",["Glass Door"],1],"894":["DF_DS-FAILURE",["DF_DS-FAILURE"],1],"895":["combatant",[],1],"896":["conversation 113 topic script",["Dog"],2],"897":["helper",["object created by script $000 with sprite $B8","object created by script $02E with sprite $B8","object created by script $104 with sprite $B8","object created by script $136 with sprite $B8","object created by script $160 with sprite $B8","object created by script $1D9 with sprite $B8"],17],"898":["Coffin Lid",["Coffin Lid"],5],"899":["Hitman",["Hitman"],1],"900":["Helicopter Pilot",["Helicopter Pilot"],1],"901":["Vampire!",["Vampire!"],2],"902":["Club Manager",["Club Manager"],1],"903":["conversation 112 topic script",["Hiring"],1],"904":["Mesh Jacket",["Mesh Jacket"],1],"905":["conversation 87 topic script",["Glutman","The Cage"],1],"906":["Scientist",["Scientist"],1],"907":["Akimi",["Akimi"],1],"908":["Mage",["Mage"],1],"909":["shows: \"Nothing special here.\"",[],1],"910":["Tickets",["Tickets"],1],"911":["Password",["Password"],1],"912":["arena fighter appears if flagged",[],1],"913":["conversation 16 topic script",["Firearms"],2],"914":["conversation 64 topic script",["Head Computer"],1],"915":["Door",["Door"],1],"916":["Door",["Door"],1],"917":["conversation 2 topic script",["conversation 2, topic default answer","conversation 36, topic Talk","conversation 36, topic default answer"],3],"918":["shows: \"There is no answer.\"",[],1],"919":["Hitman",["Hitman"],1],"920":["combatant",[],1],"921":["Green Bottle",["Green Bottle"],1],"922":["door to $08B",[],0],"923":["floor zone",["floor zone (runs while Jake stands in it) at $037, $039, $047, $147"],1],"924":["floor zone",["floor zone (runs while Jake stands in it) at $162, $163, $17D, $17E, $17F, $180,"],1],"925":["Dances",["Dances"],1],"926":["Glutman",["Shady character..."],1],"927":["combatant",[],1],"928":["Jetboy",["Jetboy"],1],"929":["helper",[],1],"930":["floor zone",["floor zone (runs while Jake stands in it) at $164, $165, $166, $167, $16B, $16C,"],1],"931":["helper",[],1],"932":["helper",["object created by script $16E with sprite $DA"],2],"933":["Nuyen",["Nuyen"],2],"934":["Bubbles",["Bubbles"],2],"935":["Decker",["Decker"],1]},"pack":{"716":"cyberware for runners (street doc)","429":"runner wired reflexes (AI)","808":"runner wired reflexes (mage AI)","489":"runner wired reflexes (AI)","126":"More Enemies (spawn roll)","665":"Arena Leagues (prizes)","280":"Arena Leagues (fight offer)","484":"Arena Leagues (manager)","800":"copy equipping (armor)","17":"copy equipping (weapons)","180":"copy equipping (reads this shop's prices)","185":"copy equipping (reads this shop's prices)","189":"copy equipping (reads this shop's prices)","192":"copy equipping (reads this shop's prices)","201":"copy equipping (reads this shop's prices)","206":"copy equipping (reads this shop's prices)","207":"copy equipping (reads this shop's prices)","208":"copy equipping (reads this shop's prices)","332":"copy equipping (reads this shop's prices)","769":"copy equipping (reads this shop's prices)","775":"copy equipping (reads this shop's prices)","780":"copy equipping (reads this shop's prices)","783":"copy equipping (reads this shop's prices)","787":"copy equipping (reads this shop's prices)","790":"copy equipping (reads this shop's prices)","832":"copy equipping (reads this shop's prices)","840":"copy equipping (reads this shop's prices)","846":"copy equipping (reads this shop's prices)"}}</script>
+<script>
+(() => {
+'use strict';
+const META = JSON.parse(document.getElementById('smeta').textContent);
+const $ = id => document.getElementById(id);
+const hex = (n, w = 3) => n.toString(16).toUpperCase().padStart(w, '0');
+const fmtCrc = c => c.toString(16).toUpperCase().padStart(8, '0');
+const crc32 = u8 => { let c, crc = 0xFFFFFFFF; const T = crc32.T || (crc32.T = Array.from({ length: 256 }, (_, n) => { c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; })); for (let i = 0; i < u8.length; i++) crc = T[(crc ^ u8[i]) & 0xFF] ^ (crc >>> 8); return (crc ^ 0xFFFFFFFF) >>> 0; };
+let romU8 = null, vm = null, T = null, romName = '', romCrc = 0, cur = null, filter = 'all', pack = false;
+const original = new Map();   // id -> decompiled text (with notes)
+const edits = new Map();      // id -> edited text
+const builds = new Map();     // id -> build result for edited scripts
+function status(text, kind) { const s = $('status'); s.textContent = text; s.className = 'msg' + (kind ? ' ' + kind : ''); }
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+const meta = id => id >= SV.NEW_BASE ? ['New script', [], 0] : (META.meta[id] || ['', [], 0]);
+const isNew = id => id >= SV.NEW_BASE;
+const NEW_TEMPLATE = id => 'script $' + hex(id) + ' args 1 returns no\n    self = arg1\n    ; your code here\n    end\n';
+// args/returns of every new script as written now, so that other scripts can call it before it is in the ROM
+function headSig(t) { const m = /^\s*script\s+\$?[0-9A-Fa-f]+\s+args\s+(\d+)\s+returns\s+(yes|no)/m.exec(t || ''); return m ? [+m[1], m[2] === 'yes'] : null; }
+function syncPending() { vm.pending.clear(); vm.gone.clear(); for (const [id, t] of edits) if (isNew(id) && t == null) vm.gone.add(id); for (const [id, t] of edits) if (isNew(id) && t != null) { const h = headSig(t); if (h) vm.pending.set(id, h); } }
+function newIds() { const s = new Set(vm.newDir.keys()); for (const [id, t] of edits) if (isNew(id)) { if (t == null) s.delete(id); else s.add(id); } return [...s].sort((a, b) => a - b); }
+function rebuildAll() { syncPending(); for (const [id, t] of edits) { if (t == null) { builds.set(id, null); continue; } try { builds.set(id, SV.build(vm, t, id)); } catch (e) { builds.delete(id); } } }
+
+async function loadRom(file) {
+  let u8 = new Uint8Array(await file.arrayBuffer());
+  if (u8.length % 0x8000 === 512) u8 = u8.slice(512);
+  const title = String.fromCharCode(...u8.slice(0x7FC0, 0x7FC9));
+  if (title !== 'SHADOWRUN' || u8.length < 0x100000) { status('That file is not a Shadowrun (USA) ROM (title "' + title.trim() + '"). Open the .sfc or .smc file of the US release.', 'err'); return; }
+  romU8 = u8; romName = file.name; romCrc = crc32(u8); vm = new SV.VM(u8); T = new ST.Texts(u8);
+  pack = u8.length >= 0x200000 && u8.slice(SV.L(0xBF8000), SV.L(0xBF8000) + 64).some(x => x);
+  original.clear(); edits.clear(); builds.clear();
+  $('romname').textContent = file.name + ' · ' + (u8.length >> 20) + ' MB · CRC ' + fmtCrc(romCrc) + (pack ? ' · Runner Pack' : '');
+  $('welcome').hidden = true; $('app').hidden = false; $('projlabel').hidden = false;
+  fillCmds();
+  const saved = store.get('sr-script-edits-' + romCrc);
+  if (saved) { try { applyProject(JSON.parse(saved), true); } catch (e) {} } else status('Pick a script on the left. Its code appears in the middle.', 'ok');
+  fillList(); select(0x060);
+}
+$('romfile').onchange = e => { if (e.target.files[0]) loadRom(e.target.files[0]); e.target.value = ''; };
+const welcome = $('welcome');
+['dragenter', 'dragover'].forEach(t => document.addEventListener(t, e => { e.preventDefault(); welcome.classList.add('hot'); }));
+['dragleave', 'drop'].forEach(t => document.addEventListener(t, e => { e.preventDefault(); welcome.classList.remove('hot'); }));
+document.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (!f) return; if (/\.json$/i.test(f.name) && romU8) loadProject(f); else loadRom(f); });
+
+// ------------------------------------------------------------ decompile with notes
+function msgText(i) { try { const id = vm.w(0x80D980 + 2 * i); const d = T.decode(id); return d ? ST.fromCodes(d.codes).replace(/\|/g, '') : null; } catch (e) { return null; } }
+const num = s => { if (s == null) return null; if (/^\$[0-9A-Fa-f]+$/.test(s)) return parseInt(s.slice(1), 16); if (/^[+-]?\d+$/.test(s)) return parseInt(s, 10); return null; };
+function annotate(kind, id, args) {
+  if (kind === 'script') { const m = meta(id); return m[0] ? m[0] : null; }
+  const q = s => { const t = msgText(num(s)); return t != null ? '"' + (t.length > 70 ? t.slice(0, 70) + '…' : t) + '"' : null; };
+  if (id === 0x99 || id === 0xD6) return q(args[args.length - 1]);
+  if (id === 0xB4) return q(args[0]);
+  if (id === 0xC7) return q(args[1]);
+  if ((id === 0x56 || id === 0x54) && num(args[0]) != null) return 'to location $' + hex(num(args[0]));
+  return null;
+}
+function orig(id) { if (!original.has(id)) original.set(id, isNew(id) && !vm.inRom(id) ? NEW_TEMPLATE(id) : vm.decompile(id, annotate)); return original.get(id); }
+const textOf = id => edits.has(id) && edits.get(id) != null ? edits.get(id) : orig(id);
+
+// ------------------------------------------------------------ list
+let codeIndex = null;
+function buildCodeIndex() { codeIndex = []; for (let id = 0; id < SV.NSCR; id++) codeIndex.push(orig(id).toLowerCase()); }
+function fillList() {
+  const q = $('q').value.trim().toLowerCase(), list = $('list'), inCode = $('incode').checked; list.textContent = ''; let n = 0;
+  if (inCode && q && !codeIndex) { status('Indexing the code of all 936 scripts…'); buildCodeIndex(); status('Searching inside the code too.'); }
+  const ids = []; for (let id = 0; id < SV.NSCR; id++) ids.push(id); ids.push(...newIds());
+  for (const id of ids) {
+    const m = meta(id), name = m[0] || (m[1][0] || '');
+    if (filter === 'new' && !isNew(id)) continue;
+    if (filter === 'named' && !name) continue;
+    if (filter === 'edited' && !edits.has(id)) continue;
+    if (q) { const hay = (name + ' ' + m[1].join(' ') + ' $' + hex(id).toLowerCase() + ' ' + hex(id).toLowerCase()).toLowerCase();
+      if (!hay.includes(q.replace(/^\$/, '$')) && !(inCode && (isNew(id) ? textOf(id).toLowerCase() : codeIndex[id]).includes(q))) continue; }
+    const b = document.createElement('button'); b.type = 'button'; b.dataset.id = id;
+    b.innerHTML = '<span class="t"></span><span class="w"></span>';
+    b.firstChild.textContent = (edits.has(id) ? '● ' : '') + '$' + hex(id) + (name ? ' · ' + name : '');
+    if (edits.has(id)) b.firstChild.classList.add('ed'); else if (pack && META.pack[id]) b.firstChild.classList.add('pk');
+    b.lastChild.textContent = isNew(id) ? (vm.inRom(id) ? 'added by an earlier patch' : 'not in the ROM yet') : m[2] ? 'used by ' + (m[1].slice(0, 3).join(', ') || m[2] + ' thing' + (m[2] > 1 ? 's' : '')) : 'nothing known uses it';
+    b.setAttribute('aria-pressed', cur === id); b.onclick = () => select(id); list.appendChild(b); n++;
+  }
+  $('count').textContent = n + ' script' + (n === 1 ? '' : 's');
+}
+$('q').oninput = fillList; $('incode').onchange = fillList;
+document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { filter = b.dataset.f; document.querySelectorAll('[data-f]').forEach(x => x.setAttribute('aria-pressed', x === b)); fillList(); });
+
+// ------------------------------------------------------------ editor
+function select(id) {
+  cur = id; for (const b of $('list').children) b.setAttribute('aria-pressed', +b.dataset.id === id);
+  const m = meta(id); $('ctitle').textContent = m[0] || 'Script $' + hex(id); $('cid').textContent = 'script $' + hex(id);
+  $('delscr').hidden = !isNew(id); $('delscr').disabled = !(isNew(id) && id === Math.max(...newIds()));
+  $('delscr').title = $('delscr').disabled ? 'Only the highest-numbered new script can be deleted (the numbers must stay without gaps). Empty this one instead.' : '';
+  $('uses').textContent = isNew(id) ? 'A brand-new script. Other scripts run it with script_' + hex(id) + '(...), passing as many values as its args.' : m[2] ? 'Used by: ' + (m[1].join(', ') || '') + (m[2] > m[1].length ? (m[1].length ? ' and ' : '') + (m[2] - m[1].length) + ' more (see the Script Atlas)' : '') : 'Nothing known uses this script (it may be started by the engine, or be a leftover).';
+  const pw = $('packwarn'); pw.hidden = !(pack && META.pack[id]);
+  pw.textContent = 'The Runner Pack recognises this script by its address: ' + (META.pack[id] || '') + '. Editing it can switch that feature off. Small edits that keep the code the same length are safest.';
+  $('src').value = textOf(id); gutter(); compileNow();
+}
+function gutter() { const n = $('src').value.split('\n').length; let s = ''; for (let i = 1; i <= n; i++) s += i + '\n'; $('gutter').textContent = s; $('gutter').scrollTop = $('src').scrollTop; }
+$('src').addEventListener('scroll', () => { $('gutter').scrollTop = $('src').scrollTop; });
+let tmr = 0;
+$('src').addEventListener('input', () => { gutter(); clearTimeout(tmr); tmr = setTimeout(compileNow, 250); });
+$('src').addEventListener('keydown', e => { if (e.key === 'Tab') { e.preventDefault(); const t = e.target, s = t.selectionStart; t.setRangeText('    ', s, t.selectionEnd, 'end'); t.dispatchEvent(new Event('input')); } });
+function compileNow() {
+  if (cur == null) return;
+  const txt = $('src').value, st = $('cstat'), same = txt === orig(cur);
+  try {
+    if (isNew(cur)) { const h = headSig(txt); if (h) vm.pending.set(cur, h); }
+    const b = SV.build(vm, txt, cur), keep = !same || (isNew(cur) && !vm.inRom(cur));
+    let msg, kind = '';
+    if (isNew(cur) && !vm.inRom(cur)) msg = 'Compiles: ' + (2 + b.code.length) + ' bytes. New script $' + hex(cur) + ' takes ' + b.args + ' value' + (b.args === 1 ? '' : 's') + (b.ret ? ' and gives one back.' : '.');
+    else {
+      const ins = vm.decode(cur), oldLen = 2 + Math.max(...ins.map(i => i.pc + i.len)), newLen = 2 + b.code.length;
+      const oldArgs = vm.newDir.has(cur) ? vm.newDir.get(cur).args : vm.scriptArgs(cur), oldRet = vm.newDir.has(cur) ? vm.newDir.get(cur).ret : vm.scriptRet(cur);
+      msg = 'Compiles: ' + newLen + ' bytes (was ' + oldLen + ').';
+      if (b.args !== oldArgs || b.ret !== oldRet) { msg += ' The header changes what this script takes or gives back: every script that calls it must match.'; kind = 'warn'; }
+    }
+    if (keep) { edits.set(cur, txt); builds.set(cur, b); } else { edits.delete(cur); builds.delete(cur); }
+    st.textContent = same ? 'Original code. ' + msg : msg; st.className = 'cstat' + (kind ? ' ' + kind : '');
+  } catch (e) {
+    if (!same || (isNew(cur) && !vm.inRom(cur))) { edits.set(cur, txt); builds.delete(cur); }
+    st.textContent = e.message || String(e); st.className = 'cstat err';
+    if (e.line) { const lines = txt.split('\n'); let pos = 0; for (let i = 0; i < e.line - 1 && i < lines.length; i++) pos += lines[i].length + 1; }
+  }
+  $('revert').disabled = !edits.has(cur);
+  const item = [...$('list').children].find(b => +b.dataset.id === cur);
+  if (item) { const m = meta(cur), name = m[0] || (m[1][0] || ''); item.firstChild.textContent = (edits.has(cur) ? '● ' : '') + '$' + hex(cur) + (name ? ' · ' + name : ''); item.firstChild.classList.toggle('ed', edits.has(cur)); }
+  if (isNew(cur)) for (const id of edits.keys()) if (id !== cur && edits.get(id) != null) { try { builds.set(id, SV.build(vm, edits.get(id), id)); } catch (e) { builds.delete(id); } }
+  const broken = [...edits.keys()].filter(id => !builds.has(id));
+  $('export').disabled = !edits.size || broken.length > 0; $('saveproj').disabled = !edits.size;
+  if (broken.length && edits.size) status('Export is off until every edited script compiles: ' + broken.map(id => '$' + hex(id)).join(', ') + '.', 'err');
+  store.set('sr-script-edits-' + romCrc, JSON.stringify(projectJson()));
+}
+$('newscr').onclick = () => {
+  const ids = newIds(), id = ids.length ? Math.max(...ids) + 1 : SV.NEW_BASE;
+  if (id >= SV.NEW_BASE + SV.NEW_MAX) { status('That is the most new scripts this editor can add (' + SV.NEW_MAX + ').', 'err'); return; }
+  original.delete(id); edits.set(id, NEW_TEMPLATE(id)); vm.gone.delete(id); vm.pending.set(id, [1, false]); fillList(); select(id);
+  status('New script $' + hex(id) + ' added. Write its code, then run it from another script with script_' + hex(id) + '(self).', 'ok');
+};
+$('delscr').onclick = () => {
+  if (cur == null || !isNew(cur)) return; const id = cur, tag = 'script_' + hex(id).toLowerCase();
+  const callers = [...edits].filter(([k, t]) => k !== id && t != null && t.toLowerCase().includes(tag)).map(([k]) => '$' + hex(k));
+  if (vm.inRom(id)) { edits.set(id, null); builds.set(id, null); } else { edits.delete(id); builds.delete(id); }
+  vm.pending.delete(id); original.delete(id); rebuildAll(); fillList(); const rest = newIds(); select(rest.length ? rest[rest.length - 1] : 0x060);
+  status('Deleted new script $' + hex(id) + '.' + (callers.length ? ' Still called by ' + callers.join(', ') + ': fix those before exporting.' : ''), callers.length ? 'err' : 'ok');
+};
+$('revert').onclick = () => { if (cur == null) return; if (isNew(cur) && !vm.inRom(cur)) { edits.set(cur, NEW_TEMPLATE(cur)); $('src').value = NEW_TEMPLATE(cur); gutter(); compileNow(); status('Back to an empty new script.'); return; } edits.delete(cur); builds.delete(cur); $('src').value = orig(cur); gutter(); compileNow(); status('Back to the original code.'); };
+
+// ------------------------------------------------------------ command list
+function fillCmds() {
+  const q = $('cq').value.trim().toLowerCase(), box = $('cmds'); box.textContent = '';
+  const all = Object.entries(SV.NATIVES).map(([k, v]) => [v.replace('?', ''), +k]).sort((a, b) => a[0].localeCompare(b[0]));
+  for (const [nm, id] of all) {
+    if (q && !nm.toLowerCase().includes(q)) continue;
+    const na = vm.nativeArgs(id), rt = vm.nativeRet(id), b = document.createElement('button'); b.type = 'button';
+    b.innerHTML = '<b></b><span></span>'; b.firstChild.textContent = nm; b.lastChild.textContent = na + (rt ? ' →' : '');
+    b.title = SV.NATIVES[id].includes('?') ? 'Name is a best guess from what the routine does' : nm;
+    b.onclick = () => { const ta = $('src'), s = ta.selectionStart, args = Array.from({ length: na }, (_, i) => i === na - 1 ? 'self' : '0').join(', ');
+      ta.setRangeText(nm + '(' + args + ')', s, ta.selectionEnd, 'end'); ta.focus(); ta.dispatchEvent(new Event('input')); };
+    box.appendChild(b);
+  }
+}
+$('cq').oninput = fillCmds;
+
+// ------------------------------------------------------------ projects + export
+function projectJson() { const s = {}; for (const [id, t] of edits) s[hex(id)] = t; return { tool: 'Shadowrun Script Editor', version: 1, base_crc32: fmtCrc(romCrc), base_name: romName, scripts: s }; }
+function applyProject(j, auto) {
+  let n = 0, bad = 0;
+  for (const [k, t] of Object.entries(j.scripts || {})) { const id = parseInt(k, 16);
+    if (!((id >= 0 && id < SV.NSCR) || (id >= SV.NEW_BASE && id < SV.NEW_BASE + SV.NEW_MAX))) continue;
+    if (t === null && isNew(id)) { edits.set(id, null); n++; continue; } if (typeof t !== 'string') continue; edits.set(id, t); n++; }
+  rebuildAll(); bad = [...edits].filter(([id, t]) => t != null && !builds.has(id)).length;
+  const other = j.base_crc32 && j.base_crc32 !== fmtCrc(romCrc);
+  status((auto ? 'Picked up your unsaved edits from last time: ' : 'Loaded edits: ') + n + ' script' + (n === 1 ? '' : 's') + '.' + (bad ? ' ' + bad + ' do not compile yet.' : '') + (other ? ' They were made on a different ROM; check them before exporting.' : ''), other || bad ? 'err' : 'ok');
+  if (cur != null) { fillList(); select(cur); }
+}
+async function loadProject(file) { try { applyProject(JSON.parse(await file.text()), false); } catch (e) { status('Could not read that edits file: ' + e.message, 'err'); } }
+$('projfile').onchange = e => { if (e.target.files[0]) loadProject(e.target.files[0]); e.target.value = ''; };
+async function offer(filename, data) {
+  const dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
+  if (dl) {
+    try { await dl.save({ filename, data }); return true; }
+    catch (e) { if (e && e.code === 'declined') { status('Save cancelled.'); return false; } if (!['unavailable', 'not_granted', 'capability_disabled', 'capability_removed'].includes(e && e.code)) { status('Could not save: ' + (e && e.message || e), 'err'); return false; } }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data])); a.download = filename; document.body.appendChild(a); a.click(); a.remove(); return true;
+}
+function ipsDiff(oldU8, newU8) {
+  const out = [0x50, 0x41, 0x54, 0x43, 0x48], n = newU8.length, grew = n > oldU8.length, old = i => (i < oldU8.length ? oldU8[i] : 0); let i = 0;
+  while (i < n) { if (old(i) === newU8[i]) { i++; continue; } let j = i; while (j < n && j - i < 0xFFFF && (old(j) !== newU8[j] || (j + 1 < n && old(j + 1) !== newU8[j + 1]))) j++;
+    let s = i; if (s === 0x454F46) s--; out.push(s >> 16, (s >> 8) & 0xFF, s & 0xFF, ((j - s) >> 8) & 0xFF, (j - s) & 0xFF); for (let k = s; k < j; k++) out.push(newU8[k]); i = j; }
+  if (grew) { const s = n - 1; out.push(s >> 16, (s >> 8) & 0xFF, s & 0xFF, 0, 1, newU8[n - 1]); }
+  out.push(0x45, 0x4F, 0x46); return Uint8Array.from(out);
+}
+function zip(files) {
+  const enc = new TextEncoder(), parts = [], central = []; let off = 0;
+  for (const f of files) {
+    const name = enc.encode(f.name), data = typeof f.data === 'string' ? enc.encode(f.data) : f.data, crc = crc32(data);
+    const h = new DataView(new ArrayBuffer(30)); h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(12, 0x5521, true); h.setUint32(14, crc, true); h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, name.length, true);
+    parts.push(new Uint8Array(h.buffer), name, data);
+    const c = new DataView(new ArrayBuffer(46)); c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(14, 0x5521, true); c.setUint32(16, crc, true); c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, name.length, true); c.setUint32(42, off, true);
+    central.push(new Uint8Array(c.buffer), name); off += 30 + name.length + data.length;
+  }
+  const csize = central.reduce((s, p) => s + p.length, 0), e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, csize, true); e.setUint32(16, off, true);
+  return new Blob([...parts, ...central, new Uint8Array(e.buffer)]);
+}
+$('saveproj').onclick = () => offer('shadowrun_script_edits.json', JSON.stringify(projectJson(), null, 1));
+$('export').onclick = async () => {
+  status('Building the patch…'); await new Promise(r => setTimeout(r, 30));
+  let res; try { res = SV.applyScripts(romU8, builds); } catch (e) { status('Could not build the patch: ' + e.message, 'err'); return; }
+  const ips = ipsDiff(romU8, res.rom), crcOut = fmtCrc(crc32(res.rom));
+  res.report.sort((x, y) => x.id - y.id);
+  const lines = res.report.map(r => r.where === 'new' ? 'new script $' + hex(r.id) + ': ' + r.size + ' bytes at $' + hex(r.addr, 6) : r.where === 'deleted' ? 'new script $' + hex(r.id) + ': deleted' : 'script $' + hex(r.id) + (meta(r.id)[0] ? ' (' + meta(r.id)[0] + ')' : '') + ': ' + r.size + ' bytes, ' + (r.where === 'in place' ? 'in place' : 'moved to $' + hex(r.addr, 6)) + (pack && META.pack[r.id] ? '  [Runner Pack: ' + META.pack[r.id] + ']' : ''));
+  const readme = ['Shadowrun Script Editor patch', '', 'Apply Shadowrun_Scripts.ips to the ROM you edited:', '  ' + romName + '  (' + (romU8.length >> 20) + ' MB, CRC32 ' + fmtCrc(romCrc) + ')', 'Result: ' + (res.rom.length >> 20) + ' MB, CRC32 ' + crcOut, '', ...lines, '',
+    'Scripts that grew live in banks $AC-$AE; the script directory in bank $82 points at them.',
+    ...(res.report.some(r => r.where === 'new') || vm.newDir.size ? ['New scripts ($400 and up) are listed in a small directory at $AC:A400; three hooks ($80C298, $80F433, $80F473) send the game there and pass every other script number on, so the Runner Pack\'s own scripts keep working.'] : []),
+    'The source of every edited script is in shadowrun_script_edits.json: load it in the editor to keep working or to rebuild the patch on another ROM.',
+    'Map, text and colour patches use other parts of the ROM. Apply this one after the Runner Pack if you use it.'].join('\n');
+  const srcs = [...edits].map(([id, t]) => ({ name: 'scripts/script_' + hex(id) + '.srs', data: t }));
+  const ok = await offer('Shadowrun_Scripts.zip', zip([{ name: 'Shadowrun_Scripts.ips', data: ips }, { name: 'shadowrun_script_edits.json', data: JSON.stringify(projectJson(), null, 1) }, { name: 'README.txt', data: readme }, ...srcs]));
+  if (ok) status('Patch ready: ' + res.report.length + ' script' + (res.report.length === 1 ? '' : 's') + ', IPS ' + ips.length + ' bytes. Patched ROM CRC32 ' + crcOut + '.', 'ok');
+};
+})();
+</script>
+
+</html>
