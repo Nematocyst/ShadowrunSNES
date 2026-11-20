@@ -1,0 +1,480 @@
+
+.smain { display: grid; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: 12px; flex: 1 1 auto; min-height: 0; }
+@media (max-width: 860px) { .smain { grid-template-columns: minmax(0, 1fr); } }
+.slist { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; max-height: calc(100vh - 230px); min-height: 300px; }
+.slist button { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 8px; align-items: center; text-align: left; padding: 4px 8px; background: transparent; border-color: transparent; white-space: normal; }
+.slist button:hover { background: var(--panel-2); }
+.slist button[aria-pressed="true"] { background: var(--panel-2); border-color: var(--accent); color: var(--fg); }
+.slist canvas { width: 44px; height: 44px; image-rendering: pixelated; background: #000; border-radius: 4px; }
+.slist .t { font-size: 13px; } .slist .w { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+.slist .ed { color: var(--accent); font-weight: 600; }
+.stage2 { background: #22262f; border: 1px solid var(--line); border-radius: 8px; display: flex; align-items: center; justify-content: center; min-height: 200px; padding: 12px; overflow: auto; }
+.stage2 canvas { image-rendering: pixelated; }
+.sw { display: flex; flex-wrap: wrap; gap: 4px; }
+.sw button { width: 34px; height: 34px; padding: 0; border-radius: 6px; border: 2px solid var(--line); position: relative; }
+.sw button.chg { border-color: var(--accent); }
+.sw button span { position: absolute; bottom: 1px; right: 3px; font: 9px var(--mono); color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000; }
+.sw .zero { background: repeating-conic-gradient(#555 0 25%, #333 0 50%) 0 0 / 10px 10px; cursor: default; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chips button { padding: 4px 10px; font-size: 12px; border-radius: 999px; }
+.chips button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.facing { display: grid; grid-template-columns: repeat(4, auto); gap: 4px; }
+.facing button { padding: 3px 8px; font-size: 12px; }
+.muted.small { font-size: 12px; }
+.brushes button.sel { outline: 3px solid var(--accent); outline-offset: 1px; }
+#big { cursor: crosshair; touch-action: none; }
+.shared-list { font-size: 12px; color: var(--muted); max-height: 70px; overflow-y: auto; }
+</style>
+
+<div class="wrap">
+<header>
+  <h1>Shadowrun <span>Sprite Colours</span></h1>
+  <span class="muted" id="romname">No ROM loaded</span>
+  <span class="grow"></span>
+  <label class="btn" for="romfile">Open ROM…</label>
+  <input type="file" id="romfile" accept=".sfc,.smc,.bin" class="visually-hidden">
+  <label class="btn" for="projfile" id="projlabel" hidden>Load edits…</label>
+  <input type="file" id="projfile" accept=".json" class="visually-hidden">
+  <button id="saveproj" disabled>Save edits</button>
+  <button id="export" class="primary" disabled>Export patch</button>
+</header>
+
+<section id="welcome" class="drop" aria-label="Open a ROM">
+  <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+    <h2>Recolour and repaint any character</h2>
+    <p>Most characters in Shadowrun share their colours: Jake's palette is also used by 117 other sprites. This tool gives a character a palette of its own, so you can recolour Jake without recolouring half of Seattle. You can still change a shared palette for everyone when that is what you want.</p>
+    <ol>
+      <li>Open your Shadowrun (USA) ROM. Vanilla and Runner Pack ROMs both work. It stays in your browser.</li>
+      <li>Pick a character, click a colour swatch and choose a new colour. The preview animates in the new colours.</li>
+      <li>Or turn on <b>Paint pixels</b> and repaint the character's pixel art with its palette's colours.</li>
+      <li>Export: you get a .zip with the .ips patch for that ROM. Apply it after the Runner Pack.</li>
+    </ol>
+  </div>
+  <figure style="margin:0;display:flex;flex-direction:column;gap:6px;min-width:0">
+    <img alt="Jake in his original colours and with his own recoloured palette, in the game" src="data:image/png;base64,/*PREVIEW*/">
+    <figcaption class="muted" style="font-size:12px">Jake with his own palette (right). The trash can, which shared his old palette, keeps its colours.</figcaption>
+  </figure>
+</section>
+
+<div id="app" hidden style="display:flex;flex-direction:column;gap:12px;flex:1 1 auto;min-height:0">
+  <div class="smain">
+    <div class="card" style="min-height:0">
+      <input type="search" id="q" placeholder="Search: Jake, Ghoul, $0B…" aria-label="Search sprites">
+      <div class="chips" role="group" aria-label="Filter"><button data-f="all" aria-pressed="true">All</button><button data-f="named" aria-pressed="false">Named</button><button data-f="edited" aria-pressed="false">Edited</button></div>
+      <div class="muted small" id="count"></div>
+      <div class="slist" id="list"></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+      <div class="card">
+        <div class="row"><h2 class="grow" id="sname">Sprite</h2><span class="badge mono" id="sid"></span></div>
+        <div class="stage2"><canvas id="pv" width="64" height="64"></canvas></div>
+        <div class="row">
+          <label class="field">Animation <select id="anim"></select></label>
+          <div class="field">Facing <div class="facing" id="facing"></div></div>
+          <button id="play" aria-pressed="true">Playing</button>
+          <span class="muted small" id="group"></span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="row"><h2 class="grow">Pixels</h2><button id="pixon" aria-pressed="false">Paint pixels</button></div>
+        <div class="muted small" id="pixintro">Repaint the character's pixel art with the colours of its palette: pencil, fill, colour picker (or right-click), copy and paste between frames (also mirrored, for the opposite facing), and a PNG round trip for drawing in another program.</div>
+        <div id="pixui" hidden style="display:flex;flex-direction:column;gap:10px">
+          <div class="row"><button id="fprev" aria-label="Previous frame">◀</button><span class="mono" id="fpos"></span><button id="fnext" aria-label="Next frame">▶</button><span class="grow"></span><button id="pundo" disabled>Undo</button><button id="preset">Reset this character's pixels</button></div>
+          <div class="row"><div class="chips" role="group" aria-label="Tool"><button data-tool="pen" aria-pressed="true">Pencil</button><button data-tool="fill" aria-pressed="false">Fill</button><button data-tool="pick" aria-pressed="false">Pick colour</button></div>
+            <span class="grow"></span><button id="fcopy">Copy frame</button><button id="fpaste" disabled>Paste</button><button id="fpastem" disabled>Paste mirrored</button></div>
+          <div class="sw brushes" id="brushes"></div>
+          <div class="row"><button id="pngout">Save frame as PNG</button><label class="btn" for="pngin">Load PNG into frame…</label><input type="file" id="pngin" accept=".png,image/png" class="visually-hidden"><span class="muted small" id="pngnote"></span></div>
+          <div class="stage2" style="justify-content:flex-start"><canvas id="big" width="16" height="16"></canvas></div>
+          <div class="muted small" id="pixnote"></div>
+        </div>
+      </div>
+      <div id="pals" style="display:flex;flex-direction:column;gap:12px"></div>
+      <div class="card">
+        <h2>Palette budget</h2>
+        <div class="meters" id="meters"></div>
+        <div class="muted small">The SNES shows 8 sprite palettes at once. The game uses up to 7 in busy scenes, so one own palette always fits; if a scene ever runs out, a character with its own palette falls back to its old shared colours instead of breaking the picture.</div>
+      </div>
+    </div>
+  </div>
+  <div id="status" class="msg" aria-live="polite">Ready.</div>
+  <input type="color" id="picker" class="visually-hidden" aria-label="Pick a colour">
+</div>
+</div>
+
+<script>/*SRTEXT*/</script>
+<script>/*SRSPR*/</script>
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const hex = (n, w = 2) => n.toString(16).toUpperCase().padStart(w, '0');
+const fmtCrc = c => c.toString(16).toUpperCase().padStart(8, '0');
+const crc32 = u8 => { let c, crc = 0xFFFFFFFF; const T = crc32.T || (crc32.T = Array.from({ length: 256 }, (_, n) => { c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; })); for (let i = 0; i < u8.length; i++) crc = T[(crc ^ u8[i]) & 0xFF] ^ (crc >>> 8); return (crc ^ 0xFFFFFFFF) >>> 0; };
+const FACE = ['S', 'SW', 'W', 'NW', 'N', 'NE', 'E', 'SE'];
+let romU8 = null, S = null, romName = '', romCrc = 0, names = [], info = [], cur = null, filter = 'all';
+let anims = [], animI = 0, faceI = 0, frameI = 0, playing = true, tick = 0;
+const shared = new Map();      // pid -> colours[16]
+const own = new Map();         // leader sprite -> Map(pid -> colours[16])
+const pix = new Map();         // leader sprite -> Map('top,bot' strip words -> Uint8Array(256) repainted cell)
+let painting = false, brush = 1, undoStack = [];
+function status(text, kind) { const s = $('status'); s.textContent = text; s.className = 'msg' + (kind ? ' ' + kind : ''); }
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+
+async function loadRom(file) {
+  let u8 = new Uint8Array(await file.arrayBuffer());
+  if (u8.length % 0x8000 === 512) u8 = u8.slice(512);
+  const title = String.fromCharCode(...u8.slice(0x7FC0, 0x7FC9));
+  if (title !== 'SHADOWRUN' || u8.length < 0x100000) { status('That file is not a Shadowrun (USA) ROM (title "' + title.trim() + '"). Open the .sfc or .smc file of the US release.', 'err'); return; }
+  romU8 = u8; romName = file.name; romCrc = crc32(u8); S = new SP.Sprites(u8); shared.clear(); own.clear();
+  const T = new ST.Texts(u8), rw = a => u8[((a & 0x7F0000) >> 1) | (a & 0x7FFF)] | (u8[(((a + 1) & 0x7F0000) >> 1) | ((a + 1) & 0x7FFF)] << 8);
+  names = []; info = [];
+  for (let s = 0; s < S.n; s++) {
+    const id = rw(0x8CEFB0 + 6 * s); let nm = '';
+    if (id && id !== 0xFFFF && id < 0xC000) { const d = T.decode(id); if (d && d.codes.length < 40) nm = ST.fromCodes(d.codes).replace(/\|/g, ''); }
+    names.push(s === 0x0B ? 'Jake (' + (nm || 'Me') + ')' : nm);
+    const a = S.animations(s); info.push({ s, anims: a.length, pals: [...new Set(a.map(x => x.palette))] });
+  }
+  $('romname').textContent = file.name + ' · ' + (u8.length >> 20) + ' MB · CRC ' + fmtCrc(romCrc) + (S.installed() ? ' · ' + S.extraCount() + ' own palettes already' : '');
+  $('welcome').hidden = true; $('app').hidden = false; $('projlabel').hidden = false;
+  const saved = store.get('sr-sprite-edits-' + romCrc);
+  if (saved) { try { applyProject(JSON.parse(saved), true); } catch (e) {} } else status('Pick a character, then click a colour to change it.', 'ok');
+  fillList(); select(0x0B);
+  requestAnimationFrame(loop);
+}
+$('romfile').onchange = e => { if (e.target.files[0]) loadRom(e.target.files[0]); e.target.value = ''; };
+const welcome = $('welcome');
+['dragenter', 'dragover'].forEach(t => document.addEventListener(t, e => { e.preventDefault(); welcome.classList.add('hot'); }));
+['dragleave', 'drop'].forEach(t => document.addEventListener(t, e => { e.preventDefault(); welcome.classList.remove('hot'); }));
+document.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (!f) return; if (/\.json$/i.test(f.name) && romU8) loadProject(f); else loadRom(f); });
+
+// ------------------------------------------------------------ edits
+const leader = s => Math.min(...S.group(s));
+function palFor(s, pid) { const o = own.get(leader(s)); if (o && o.has(pid)) return o.get(pid); if (shared.has(pid)) return shared.get(pid); return S.palette(pid); }
+function modeFor(s, pid) { const o = own.get(leader(s)); return o && o.has(pid) ? 'own' : shared.has(pid) ? 'shared' : null; }
+const isEdited = s => own.has(leader(s)) || pix.has(leader(s)) || info[s].pals.some(p => shared.has(p));
+function usersOf(pid) { const out = []; for (const i of info) if (i.pals.includes(pid)) out.push(i.s); return out; }
+function ownNeeded() {      // new palette ids the export will hand out
+  let n = 0; for (const [s, m] of own) for (const pid of m.keys()) { const g = S.group(s); if (pid < SP.BASE_ID || usersOf(pid).some(o => !g.includes(o))) n++; } return n;
+}
+function setColour(s, pid, i, c) {
+  let m = modeFor(s, pid);
+  if (!m) m = usersOf(pid).filter(o => !S.group(s).includes(o)).length ? 'own' : 'shared';
+  if (m === 'own') { const L0 = leader(s); if (!own.has(L0)) own.set(L0, new Map()); const map = own.get(L0); if (!map.has(pid)) map.set(pid, palFor(s, pid).slice()); map.get(pid)[i] = c; }
+  else { if (!shared.has(pid)) shared.set(pid, S.palette(pid).slice()); shared.get(pid)[i] = c; }
+  changed();
+}
+function setMode(s, pid, m) {
+  const cols = palFor(s, pid).slice(), L0 = leader(s);
+  if (own.has(L0)) { own.get(L0).delete(pid); if (!own.get(L0).size) own.delete(L0); }
+  if (m === 'own') { if (!own.has(L0)) own.set(L0, new Map()); own.get(L0).set(pid, cols); if (shared.has(pid) && sameAsRom(pid, shared.get(pid))) shared.delete(pid); }
+  else { shared.set(pid, cols); }
+  changed();
+}
+const sameAsRom = (pid, cols) => S.palette(pid).every((c, i) => c === cols[i]);
+function resetPal(s, pid) { const L0 = leader(s); if (own.has(L0)) { own.get(L0).delete(pid); if (!own.get(L0).size) own.delete(L0); } if (modeFor(s, pid) === 'shared') shared.delete(pid); changed(); }
+function changed() {
+  for (const [pid, c] of [...shared]) if (sameAsRom(pid, c)) shared.delete(pid);
+  for (const [L0, m] of [...own]) { for (const [pid, c] of [...m]) if (sameAsRom(pid, c)) m.delete(pid); if (!m.size) own.delete(L0); }
+  for (const [L0, m] of [...pix]) if (!m.size) pix.delete(L0);
+  const any = shared.size || own.size || pix.size; $('export').disabled = !any || S.extraCount() + ownNeeded() > SP.MAX_EXTRA; $('saveproj').disabled = !any;
+  store.set('sr-sprite-edits-' + romCrc, JSON.stringify(projectJson()));
+  panels(); refreshThumb(cur); meters(); if (painting) { brushes(); drawBig(); }
+}
+
+// ------------------------------------------------------------ list
+function firstFrame(s) { for (const a of S.animations(s)) for (const f of a.facings) if (f.length) return { w: f[0], pid: a.palette }; return null; }
+function drawFrameTo(canvas, s, word, pid, scaleFit) {
+  const fr = S.frame(word, pix.get(leader(s))), P = palFor(s, pid).map(SP.rgb), g = canvas.getContext('2d');
+  if (!scaleFit) { canvas.width = fr.w; canvas.height = fr.h; }
+  const tmp = new ImageData(fr.w, fr.h);
+  for (let k = 0; k < fr.px.length; k++) { const v = fr.px[k]; if (v < 0) continue; tmp.data[k * 4] = P[v][0]; tmp.data[k * 4 + 1] = P[v][1]; tmp.data[k * 4 + 2] = P[v][2]; tmp.data[k * 4 + 3] = 255; }
+  if (!scaleFit) { g.putImageData(tmp, 0, 0); return fr; }
+  const c2 = document.createElement('canvas'); c2.width = fr.w; c2.height = fr.h; c2.getContext('2d').putImageData(tmp, 0, 0);
+  g.clearRect(0, 0, canvas.width, canvas.height); g.imageSmoothingEnabled = false;
+  const sc = Math.min(canvas.width / fr.w, canvas.height / fr.h, 2); g.drawImage(c2, (canvas.width - fr.w * sc) / 2, (canvas.height - fr.h * sc) / 2, fr.w * sc, fr.h * sc);
+  return fr;
+}
+let obs = null;
+function fillList() {
+  const q = $('q').value.trim().toLowerCase().replace('$', ''), list = $('list'); list.textContent = ''; let n = 0;
+  obs && obs.disconnect();
+  obs = new IntersectionObserver(es => es.forEach(en => { if (en.isIntersecting) { refreshThumb(+en.target.dataset.s); obs.unobserve(en.target); } }), { root: list, rootMargin: '200px' });
+  for (const i of info) {
+    if (!i.anims) continue;
+    if (filter === 'named' && !names[i.s]) continue;
+    if (filter === 'edited' && !isEdited(i.s)) continue;
+    if (q && !(names[i.s] || '').toLowerCase().includes(q) && hex(i.s) !== q.toUpperCase() && hex(i.s).toLowerCase() !== q) continue;
+    const b = document.createElement('button'); b.type = 'button'; b.dataset.s = i.s;
+    b.innerHTML = '<canvas width="44" height="44"></canvas><span><span class="t"></span><br><span class="w"></span></span>';
+    b.querySelector('.t').textContent = (isEdited(i.s) ? '● ' : '') + (names[i.s] || 'Sprite $' + hex(i.s)); if (isEdited(i.s)) b.querySelector('.t').classList.add('ed');
+    b.querySelector('.w').textContent = '$' + hex(i.s) + ' · palette ' + i.pals.map(p => '$' + hex(p)).join(', ');
+    b.setAttribute('aria-pressed', cur === i.s); b.onclick = () => select(i.s);
+    list.appendChild(b); obs.observe(b); n++;
+  }
+  $('count').textContent = n + ' sprites';
+}
+function refreshThumb(s) {
+  if (s == null) return; const b = $('list').querySelector('[data-s="' + s + '"]'); if (!b) return;
+  const f = firstFrame(s); if (f) drawFrameTo(b.querySelector('canvas'), s, f.w, f.pid, true);
+  const t = b.querySelector('.t'); t.textContent = (isEdited(s) ? '● ' : '') + (names[s] || 'Sprite $' + hex(s)); t.classList.toggle('ed', isEdited(s));
+}
+$('q').oninput = fillList;
+document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { filter = b.dataset.f; document.querySelectorAll('[data-f]').forEach(x => x.setAttribute('aria-pressed', x === b)); fillList(); });
+
+// ------------------------------------------------------------ preview
+function select(s) {
+  cur = s; anims = S.animations(s); animI = 0; frameI = 0; undoStack = []; $('pundo').disabled = true;
+  faceI = anims.length ? Math.max(0, anims[0].facings.findIndex(f => f.length)) : 0;
+  for (const b of $('list').children) b.setAttribute('aria-pressed', +b.dataset.s === s);
+  $('sname').textContent = names[s] || 'Sprite $' + hex(s); $('sid').textContent = 'sprite $' + hex(s);
+  const g = S.group(s); $('group').textContent = g.length > 1 ? 'Shares its animations with sprite ' + g.filter(o => o !== s).map(o => '$' + hex(o)).join(', ') + ', so they change together.' : '';
+  const sel = $('anim'); sel.textContent = '';
+  anims.forEach((a, i) => { const o = document.createElement('option'); o.value = i; o.textContent = 'Animation ' + (a.index + 1) + ' · palette $' + hex(a.palette); sel.appendChild(o); });
+  buildFacing(); panels(); meters(); drawBig();
+}
+function buildFacing() {
+  const box = $('facing'); box.textContent = ''; const a = anims[animI]; if (!a) return;
+  [3, 4, 5, 2, 6, 1, 0, 7].forEach(f => { const b = document.createElement('button'); b.type = 'button'; b.textContent = FACE[f]; b.disabled = !a.facings[f].length; b.setAttribute('aria-pressed', f === faceI); b.onclick = () => { faceI = f; frameI = 0; buildFacing(); drawBig(); }; box.appendChild(b); });
+}
+$('anim').onchange = () => { animI = +$('anim').value; frameI = 0; const a = anims[animI]; if (!a.facings[faceI].length) faceI = Math.max(0, a.facings.findIndex(f => f.length)); buildFacing(); drawBig(); };
+$('play').onclick = () => { playing = !playing; $('play').setAttribute('aria-pressed', playing); $('play').textContent = playing ? 'Playing' : 'Paused'; };
+function loop() {
+  requestAnimationFrame(loop);
+  if (cur == null) return; const a = anims[animI]; if (!a) return; const fr = a.facings[faceI]; if (!fr || !fr.length) return;
+  tick++; const delay = Math.max(4, (a.delay & 0x7F) || 8);
+  if (playing && !painting && tick % delay === 0) frameI = (frameI + 1) % fr.length;
+  if (tick % 2) return;
+  const cv = $('pv'), f = drawFrameTo(cv, cur, fr[frameI % fr.length], a.palette, false); cv.style.width = f.w * 4 + 'px'; cv.style.height = f.h * 4 + 'px';
+}
+
+// ------------------------------------------------------------ pixel painting
+// Cells are 16x16 graphics shared by every frame (and mirrored facing) that shows them, so a stroke changes all of
+// them. At export, strips used only by this character are rewritten; shared ones get copies (srspr.js applyPixels).
+let Z = 8, bigFrame = null;
+function curWord() { const a = anims[animI]; if (!a) return null; const f = a.facings[faceI]; return f && f.length ? f[frameI % f.length] : null; }
+function brushes() {
+  const box = $('brushes'); box.textContent = ''; const a = anims[animI]; if (!a) return;
+  palFor(cur, a.palette).forEach((c, i) => {
+    const b = document.createElement('button'); b.type = 'button';
+    if (!i) { b.className = 'zero'; b.title = 'Transparent'; b.innerHTML = '<span>0</span>'; }
+    else { const [r, g, bb] = SP.rgb(c); b.style.background = 'rgb(' + r + ',' + g + ',' + bb + ')'; b.innerHTML = '<span>' + i + '</span>'; b.title = 'Colour ' + i; }
+    b.classList.toggle('sel', i === brush); b.onclick = () => { brush = i; brushes(); }; box.appendChild(b);
+  });
+}
+function drawBig() {
+  if (!painting || cur == null) return; const w = curWord(), a = anims[animI]; if (w == null) return;
+  const fr = S.frame(w, pix.get(leader(cur))), P = palFor(cur, a.palette).map(SP.rgb); bigFrame = fr;
+  Z = Math.max(4, Math.min(14, Math.floor(520 / Math.max(fr.w, fr.h))));
+  const cv = $('big'); cv.width = fr.w * Z; cv.height = fr.h * Z; const g = cv.getContext('2d');
+  for (let y = 0; y < fr.h; y++) for (let x = 0; x < fr.w; x++) {
+    const v = fr.px[y * fr.w + x];
+    if (v < 0) { g.fillStyle = ((x + y) & 1) ? '#2c3040' : '#252836'; } else g.fillStyle = 'rgb(' + P[v].join(',') + ')';
+    g.fillRect(x * Z, y * Z, Z, Z);
+  }
+  const has = new Set(fr.cells.map(c => c.x + ',' + c.y));
+  for (let cy = 0; cy < fr.h; cy += 16) for (let cx = 0; cx < fr.w; cx += 16) if (!has.has(cx + ',' + cy)) { g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(cx * Z, cy * Z, 16 * Z, 16 * Z); }
+  g.strokeStyle = 'rgba(255,255,255,.07)'; g.beginPath();
+  for (let x = 0; x <= fr.w; x++) { g.moveTo(x * Z + .5, 0); g.lineTo(x * Z + .5, fr.h * Z); } for (let y = 0; y <= fr.h; y++) { g.moveTo(0, y * Z + .5); g.lineTo(fr.w * Z, y * Z + .5); } g.stroke();
+  g.strokeStyle = 'rgba(255,79,154,.5)'; g.beginPath();
+  for (let x = 0; x <= fr.w; x += 16) { g.moveTo(x * Z + .5, 0); g.lineTo(x * Z + .5, fr.h * Z); } for (let y = 0; y <= fr.h; y += 16) { g.moveTo(0, y * Z + .5); g.lineTo(fr.w * Z, y * Z + .5); } g.stroke();
+  const f = a.facings[faceI]; $('fpos').textContent = 'Frame ' + (frameI % f.length + 1) + ' of ' + f.length;
+  const m = pix.get(leader(cur)); $('preset').disabled = !m;
+  $('pixnote').textContent = 'Pink lines mark 16×16 graphics cells; darkened squares have no graphics and cannot be painted. A cell is often reused by other frames and by the mirrored facing, so painting it changes those too.' + (m ? ' ' + m.size + ' cell' + (m.size === 1 ? '' : 's') + ' repainted.' : '');
+}
+function cellAt(X, Y) { if (!bigFrame) return null; return bigFrame.cells.find(c => X >= c.x && X < c.x + 16 && Y >= c.y && Y < c.y + 16) || null; }
+let stroke = null;
+// set frame pixel (X, Y) to v inside the current stroke; false if (X, Y) has no graphics cell
+function setPx(X, Y, v) {
+  const c = cellAt(X, Y); if (!c) return false;
+  const L0 = leader(cur); if (!pix.has(L0)) pix.set(L0, new Map()); const m = pix.get(L0);
+  if (!stroke.saved.has(c.key)) stroke.saved.set(c.key, m.has(c.key) ? m.get(c.key).slice() : null);
+  let arr = m.get(c.key); if (!arr) { const [t, b] = c.key.split(',').map(Number); arr = S.cellPixels(t, b); m.set(c.key, arr); }
+  let x = X - c.x, y = Y - c.y; if (c.hf) x = 15 - x; if (c.vf) y = 15 - y;
+  arr[y * 16 + x] = v; return true;
+}
+const pxAt = (X, Y) => bigFrame.px[Y * bigFrame.w + X] < 0 ? 0 : bigFrame.px[Y * bigFrame.w + X];
+let tool = 'pen';
+document.querySelectorAll('[data-tool]').forEach(b => b.onclick = () => { tool = b.dataset.tool; document.querySelectorAll('[data-tool]').forEach(x => x.setAttribute('aria-pressed', x === b)); });
+function evXY(e) { const r = $('big').getBoundingClientRect(); return [Math.floor((e.clientX - r.left) / Z), Math.floor((e.clientY - r.top) / Z)]; }
+function paintAt(e) {
+  const [X, Y] = evXY(e); if (X < 0 || Y < 0 || X >= bigFrame.w || Y >= bigFrame.h || !cellAt(X, Y)) return;
+  if (pxAt(X, Y) === brush) return; setPx(X, Y, brush); drawBig();
+}
+// flood fill: 4-connected pixels of the same colour, staying inside cells that have graphics
+function fillAt(X, Y) {
+  if (!cellAt(X, Y)) return; const from = pxAt(X, Y); if (from === brush) return;
+  const W = bigFrame.w, H = bigFrame.h, seen = new Uint8Array(W * H), todo = [[X, Y]], list = [];
+  while (todo.length) { const [x, y] = todo.pop(); if (x < 0 || y < 0 || x >= W || y >= H || seen[y * W + x]) continue; seen[y * W + x] = 1;
+    if (!cellAt(x, y) || pxAt(x, y) !== from) continue; list.push([x, y]); todo.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]); }
+  for (const [x, y] of list) setPx(x, y, brush);
+}
+function oneShot(fn) { stroke = { L0: leader(cur), saved: new Map() }; fn(); endStroke(); drawBig(); }
+$('big').addEventListener('contextmenu', e => { if (painting) e.preventDefault(); });
+$('big').addEventListener('pointerdown', e => { if (!painting || !bigFrame) return;
+  const [X, Y] = evXY(e);
+  if (tool === 'pick' || e.button === 2 || e.altKey) { if (X >= 0 && Y >= 0 && X < bigFrame.w && Y < bigFrame.h) { brush = pxAt(X, Y); brushes(); } return; }
+  if (e.button !== 0) return;
+  if (tool === 'fill') { oneShot(() => fillAt(X, Y)); return; }
+  stroke = { L0: leader(cur), saved: new Map() }; $('big').setPointerCapture(e.pointerId); paintAt(e); });
+$('big').addEventListener('pointermove', e => { if (stroke) paintAt(e); });
+const endStroke = () => { if (!stroke) return; if (stroke.saved.size) { undoStack.push(stroke); $('pundo').disabled = false; } stroke = null; cleanPix(); changed(); };
+$('big').addEventListener('pointerup', endStroke); $('big').addEventListener('pointercancel', endStroke);
+function cleanPix() {   // drop cells painted back to their original pixels
+  for (const [L0, m] of [...pix]) { for (const [k, arr] of [...m]) { const [t, b] = k.split(',').map(Number), o = S.cellPixels(t, b); if (arr.every((v, i) => v === o[i])) m.delete(k); } if (!m.size) pix.delete(L0); }
+}
+$('pundo').onclick = () => { const st = undoStack.pop(); if (!st) return; const m = pix.get(st.L0) || new Map(); pix.set(st.L0, m);
+  for (const [k, v] of st.saved) { if (v) m.set(k, v); else m.delete(k); } $('pundo').disabled = !undoStack.length; cleanPix(); changed(); drawBig(); };
+$('preset').onclick = () => { if (cur == null) return; pix.delete(leader(cur)); undoStack = []; $('pundo').disabled = true; changed(); drawBig(); status('This character\'s pixels are back to the originals.'); };
+$('pixon').onclick = () => { painting = !painting; $('pixon').setAttribute('aria-pressed', painting); $('pixon').textContent = painting ? 'Painting' : 'Paint pixels';
+  $('pixui').hidden = !painting; $('pixintro').hidden = painting; if (painting) { brushes(); drawBig(); } };
+// copy / paste a whole frame (indices; empty cells are skipped), optionally mirrored left-right
+let clip = null;
+$('fcopy').onclick = () => { if (!bigFrame) return; clip = { w: bigFrame.w, h: bigFrame.h, px: Int16Array.from(bigFrame.px) }; $('fpaste').disabled = $('fpastem').disabled = false; status('Frame copied (' + clip.w + '×' + clip.h + '). Go to another frame and paste.'); };
+function paste(mirror) {
+  if (!clip || !bigFrame) return; let n = 0;
+  oneShot(() => { for (let y = 0; y < Math.min(clip.h, bigFrame.h); y++) for (let x = 0; x < Math.min(clip.w, bigFrame.w); x++) {
+    const sx = mirror ? clip.w - 1 - x : x, v = clip.px[y * clip.w + sx]; if (v < 0) continue; if (setPx(x, y, v)) n++; } });
+  status('Pasted' + (mirror ? ' mirrored' : '') + '.' + (clip.w !== bigFrame.w || clip.h !== bigFrame.h ? ' The frames differ in size (' + clip.w + '×' + clip.h + ' onto ' + bigFrame.w + '×' + bigFrame.h + '), so it was lined up at the top left.' : ''), 'ok');
+}
+$('fpaste').onclick = () => paste(false); $('fpastem').onclick = () => paste(true);
+// PNG round trip for one frame: transparent = colour 0; other colours snap to the nearest palette colour
+function frameName() { const a = anims[animI]; return 'sprite_' + hex(cur) + '_anim' + (a.index + 1) + '_' + FACE[faceI] + '_f' + (frameI % a.facings[faceI].length + 1) + '.png'; }
+$('pngout').onclick = async () => {
+  if (!bigFrame) return; const P = palFor(cur, anims[animI].palette).map(SP.rgb), c = document.createElement('canvas'); c.width = bigFrame.w; c.height = bigFrame.h;
+  const g = c.getContext('2d'), id = g.createImageData(c.width, c.height);
+  bigFrame.px.forEach((v, k) => { if (v <= 0) return; id.data.set([...P[v], 255], k * 4); }); g.putImageData(id, 0, 0);
+  const blob = await new Promise(r => c.toBlob(r, 'image/png')), data = new Uint8Array(await blob.arrayBuffer());
+  const ok = await offer(frameName(), data); if (ok) $('pngnote').textContent = 'Saved ' + frameName() + ' (' + c.width + '×' + c.height + '). Edit it with the palette colours and load it back.';
+};
+$('pngin').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f || !bigFrame) return;
+  const img = await createImageBitmap(f).catch(() => null); if (!img) { status('Could not read that image.', 'err'); return; }
+  if (img.width !== bigFrame.w || img.height !== bigFrame.h) { status('That image is ' + img.width + '×' + img.height + ' but this frame is ' + bigFrame.w + '×' + bigFrame.h + '. Save the frame as PNG first and edit that file.', 'err'); return; }
+  const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+  const d = g.getImageData(0, 0, c.width, c.height).data, P = palFor(cur, anims[animI].palette).map(SP.rgb); let snapped = 0, lost = 0;
+  oneShot(() => { for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) {
+    const o = (y * c.width + x) * 4, r = d[o], gg = d[o + 1], b = d[o + 2], a = d[o + 3]; let v = 0;
+    if (a >= 128 && !(r === 255 && gg === 0 && b === 255)) { let best = 1, bd = 1e9; for (let k = 1; k < 16; k++) { const q = P[k], dd = (q[0] - r) ** 2 + (q[1] - gg) ** 2 + (q[2] - b) ** 2; if (dd < bd) { bd = dd; best = k; } } v = best; if (bd > 3 * 8 * 8) snapped++; }
+    if (!setPx(x, y, v) && v) lost++; } });
+  status('Loaded ' + f.name + ' into this frame.' + (snapped ? ' ' + snapped + ' pixel' + (snapped === 1 ? '' : 's') + ' had colours outside the palette and took the nearest one.' : '') + (lost ? ' ' + lost + ' pixel' + (lost === 1 ? '' : 's') + ' fell on squares without graphics and were dropped.' : ''), snapped || lost ? 'err' : 'ok');
+};
+$('fprev').onclick = () => { const f = anims[animI].facings[faceI]; frameI = (frameI - 1 + f.length) % f.length; drawBig(); };
+$('fnext').onclick = () => { const f = anims[animI].facings[faceI]; frameI = (frameI + 1) % f.length; drawBig(); };
+
+// ------------------------------------------------------------ palette panels
+let pick = null;
+$('picker').addEventListener('input', () => { if (!pick) return; const v = $('picker').value, r = parseInt(v.slice(1, 3), 16), g = parseInt(v.slice(3, 5), 16), b = parseInt(v.slice(5, 7), 16); setColour(pick.s, pick.pid, pick.i, SP.snes(r, g, b)); });
+function panels() {
+  const box = $('pals'); box.textContent = ''; if (cur == null) return;
+  for (const pid of info[cur].pals) {
+    const card = document.createElement('div'); card.className = 'card';
+    const g = S.group(cur), others = usersOf(pid).filter(o => !g.includes(o)), m = modeFor(cur, pid) || (others.length ? 'own' : 'shared');
+    const head = document.createElement('div'); head.className = 'row';
+    head.innerHTML = '<h2 class="grow"></h2><button class="reset">Reset</button>';
+    head.firstChild.textContent = 'Palette $' + hex(pid) + (pid >= SP.BASE_ID ? ' (own)' : '') + (others.length ? ' · also used by ' + others.length + ' other sprite' + (others.length > 1 ? 's' : '') : ' · used only by this character');
+    head.querySelector('.reset').disabled = !modeFor(cur, pid); head.querySelector('.reset').onclick = () => resetPal(cur, pid);
+    card.appendChild(head);
+    if (others.length) {
+      const chips = document.createElement('div'); chips.className = 'chips';
+      for (const [k, label] of [['own', 'Only this character (own palette)'], ['shared', 'Everyone using palette $' + hex(pid)]]) {
+        const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.setAttribute('aria-pressed', m === k);
+        b.onclick = () => setMode(cur, pid, k); chips.appendChild(b);
+      }
+      card.appendChild(chips);
+      const sl = document.createElement('div'); sl.className = 'shared-list';
+      sl.textContent = 'Shared with: ' + others.map(o => (names[o] || 'sprite') + ' $' + hex(o)).join(', ');
+      card.appendChild(sl);
+    }
+    const sw = document.createElement('div'); sw.className = 'sw'; const cols = palFor(cur, pid), orig = S.palette(pid);
+    cols.forEach((c, i) => {
+      const b = document.createElement('button'); b.type = 'button';
+      if (!i) { b.className = 'zero'; b.title = 'Colour 0 is transparent'; b.disabled = true; sw.appendChild(b); return; }
+      const [r, gg, bb] = SP.rgb(c); b.style.background = 'rgb(' + r + ',' + gg + ',' + bb + ')'; b.innerHTML = '<span>' + i + '</span>';
+      if (c !== orig[i]) b.classList.add('chg');
+      b.title = 'Colour ' + i + ': click to change';
+      b.onclick = () => { pick = { s: cur, pid, i }; const p = $('picker'), rc = b.getBoundingClientRect(); p.style.position = 'fixed'; p.style.left = rc.left + 'px'; p.style.top = rc.bottom + 'px'; p.value = '#' + [r, gg, bb].map(v => v.toString(16).padStart(2, '0')).join(''); p.click(); };
+      sw.appendChild(b);
+    });
+    card.appendChild(sw);
+    const note = document.createElement('div'); note.className = 'muted small';
+    note.textContent = m === 'own' ? 'Changes here recolour only this character' + (g.length > 1 ? ' and the sprites that share its animations' : '') + '.' : others.length ? 'Changes here recolour every sprite listed above.' : 'Changes here recolour this character.';
+    card.appendChild(note);
+    box.appendChild(card);
+  }
+}
+function meters() {
+  const used = S.extraCount(), add = ownNeeded(), tot = used + add, m = $('meters'); m.innerHTML = '';
+  const a = document.createElement('span'); a.textContent = 'Own palettes';
+  const b = document.createElement('div'); b.className = 'bar' + (tot > SP.MAX_EXTRA ? ' over' : tot > SP.MAX_EXTRA * 0.9 ? ' warn' : ''); b.innerHTML = '<i></i>'; b.firstChild.style.width = Math.min(100, tot / SP.MAX_EXTRA * 100) + '%';
+  const c = document.createElement('span'); c.className = 'mono'; c.textContent = tot + ' / ' + SP.MAX_EXTRA;
+  m.append(a, b, c);
+  if (tot > SP.MAX_EXTRA) status('More than ' + SP.MAX_EXTRA + ' own palettes: switch some characters back to the shared palette before exporting.', 'err');
+}
+
+// ------------------------------------------------------------ projects + export
+function projectJson() {
+  const sh = {}; for (const [p, c] of shared) sh[hex(p)] = c;
+  const ow = {}; for (const [s, m] of own) { ow[hex(s)] = {}; for (const [p, c] of m) ow[hex(s)][hex(p)] = c; }
+  const px = {}; for (const [s, m] of pix) { px[hex(s)] = {}; for (const [k, arr] of m) px[hex(s)][k] = Array.from(arr, v => v.toString(16)).join(''); }
+  return { tool: 'Shadowrun Sprite Colours', version: 2, base_crc32: fmtCrc(romCrc), base_name: romName, shared: sh, own: ow, pixels: px };
+}
+function applyProject(j, auto) {
+  shared.clear(); own.clear(); pix.clear(); let n = 0;
+  const ok = c => Array.isArray(c) && c.length === 16 && c.every(v => Number.isInteger(v) && v >= 0 && v < 0x8000);
+  for (const [p, c] of Object.entries(j.shared || {})) if (ok(c)) { shared.set(parseInt(p, 16), c); n++; }
+  for (const [s, m] of Object.entries(j.own || {})) { const sp = parseInt(s, 16); if (!(sp >= 0 && sp < S.n)) continue; const mm = new Map();
+    for (const [p, c] of Object.entries(m)) if (ok(c) && info[sp].pals.includes(parseInt(p, 16))) { mm.set(parseInt(p, 16), c); n++; } if (mm.size) own.set(leader(sp), mm); }
+  let np = 0;
+  for (const [s, m] of Object.entries(j.pixels || {})) { const sp = parseInt(s, 16); if (!(sp >= 0 && sp < S.n)) continue; const mm = new Map();
+    for (const [k, h] of Object.entries(m)) if (/^\d+,\d+$/.test(k) && typeof h === 'string' && /^[0-9a-f]{256}$/i.test(h)) { mm.set(k, Uint8Array.from(h, ch => parseInt(ch, 16))); np++; }
+    if (mm.size) pix.set(leader(sp), mm); }
+  const other = j.base_crc32 && j.base_crc32 !== fmtCrc(romCrc);
+  status((auto ? 'Picked up your unsaved edits from last time: ' : 'Loaded edits: ') + n + ' palette' + (n === 1 ? '' : 's') + (np ? ' and ' + np + ' repainted cell' + (np === 1 ? '' : 's') : '') + '.' + (other ? ' They were made on a different ROM; check them before exporting.' : ''), other ? 'err' : 'ok');
+  if (cur != null) { changed(); fillList(); }
+}
+async function loadProject(file) { try { applyProject(JSON.parse(await file.text()), false); changed(); fillList(); } catch (e) { status('Could not read that edits file: ' + e.message, 'err'); } }
+$('projfile').onchange = e => { if (e.target.files[0]) loadProject(e.target.files[0]); e.target.value = ''; };
+async function offer(filename, data) {
+  const dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
+  if (dl) {
+    try { await dl.save({ filename, data }); return true; }
+    catch (e) { if (e && e.code === 'declined') { status('Save cancelled.'); return false; } if (!['unavailable', 'not_granted', 'capability_disabled', 'capability_removed'].includes(e && e.code)) { status('Could not save: ' + (e && e.message || e), 'err'); return false; } }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data])); a.download = filename; document.body.appendChild(a); a.click(); a.remove(); return true;
+}
+function ipsDiff(oldU8, newU8) {
+  const out = [0x50, 0x41, 0x54, 0x43, 0x48], n = newU8.length, grew = n > oldU8.length, old = i => (i < oldU8.length ? oldU8[i] : 0); let i = 0;
+  while (i < n) { if (old(i) === newU8[i]) { i++; continue; } let j = i; while (j < n && j - i < 0xFFFF && (old(j) !== newU8[j] || (j + 1 < n && old(j + 1) !== newU8[j + 1]))) j++;
+    let s = i; if (s === 0x454F46) s--; out.push(s >> 16, (s >> 8) & 0xFF, s & 0xFF, ((j - s) >> 8) & 0xFF, (j - s) & 0xFF); for (let k = s; k < j; k++) out.push(newU8[k]); i = j; }
+  if (grew) { const s = n - 1; out.push(s >> 16, (s >> 8) & 0xFF, s & 0xFF, 0, 1, newU8[n - 1]); }
+  out.push(0x45, 0x4F, 0x46); return Uint8Array.from(out);
+}
+function zip(files) {
+  const enc = new TextEncoder(), parts = [], central = []; let off = 0;
+  for (const f of files) {
+    const name = enc.encode(f.name), data = typeof f.data === 'string' ? enc.encode(f.data) : f.data, crc = crc32(data);
+    const h = new DataView(new ArrayBuffer(30)); h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(12, 0x5521, true); h.setUint32(14, crc, true); h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, name.length, true);
+    parts.push(new Uint8Array(h.buffer), name, data);
+    const c = new DataView(new ArrayBuffer(46)); c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(14, 0x5521, true); c.setUint32(16, crc, true); c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, name.length, true); c.setUint32(42, off, true);
+    central.push(new Uint8Array(c.buffer), name); off += 30 + name.length + data.length;
+  }
+  const csize = central.reduce((s, p) => s + p.length, 0), e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, csize, true); e.setUint32(16, off, true);
+  return new Blob([...parts, ...central, new Uint8Array(e.buffer)]);
+}
+$('saveproj').onclick = () => offer('shadowrun_sprite_colours.json', JSON.stringify(projectJson(), null, 1));
+$('export').onclick = async () => {
+  status('Building the patch…'); await new Promise(r => setTimeout(r, 30));
+  let res; try { res = SP.apply(romU8, { shared, own, pixels: pix }); } catch (e) { status('Could not build the patch: ' + e.message, 'err'); return; }
+  const ips = ipsDiff(romU8, res.rom), crcOut = fmtCrc(crc32(res.rom));
+  const lines = res.report.map(r => r.pixels ? 'sprite $' + hex(r.sprite) + ' (' + (names[r.sprite] || 'sprite') + '): ' + r.cells + ' repainted cell' + (r.cells === 1 ? '' : 's') + ', ' + r.inPlace + ' graphics strips rewritten, ' + r.copied + ' copied to bank $BC' + (r.others.length ? '; frames also used by sprite ' + r.others.map(o => '$' + hex(o)).join(', ') + ' change too' : '') : r.shared != null ? 'palette $' + hex(r.shared) + ' recoloured for everyone who uses it' : 'sprite $' + hex(r.sprite) + ' (' + (names[r.sprite] || 'sprite') + '): palette $' + hex(r.from) + (r.to !== r.from ? ' -> own palette $' + hex(r.to) : ' recoloured (already its own)'));
+  const readme = ['Shadowrun Sprite Colours patch', '', 'Apply Shadowrun_SpriteColours.ips to the ROM you edited:', '  ' + romName + '  (' + (romU8.length >> 20) + ' MB, CRC32 ' + fmtCrc(romCrc) + ')', 'Result: ' + (res.rom.length >> 20) + ' MB, CRC32 ' + crcOut, '', ...lines, '',
+    'Repainted graphics: strips used only by that character are rewritten where they are; shared ones are copied to $BC:8000-$BD:FFFF.',
+    'Own palettes live in bank $AF (hooks at $80AA97, $81A8D1, $81A8E1, and the Runner Pack sprite cache if present).',
+    'Apply this AFTER the Runner Pack: a Runner Pack patch applied later would undo the cache hook.',
+    'The map and text editor patches use different parts of the ROM and can be applied in any order.'].join('\n');
+  const ok = await offer('Shadowrun_SpriteColours.zip', zip([{ name: 'Shadowrun_SpriteColours.ips', data: ips }, { name: 'shadowrun_sprite_colours.json', data: JSON.stringify(projectJson(), null, 1) }, { name: 'README.txt', data: readme }]));
+  if (ok) status('Patch ready: ' + res.report.length + ' change' + (res.report.length === 1 ? '' : 's') + ', IPS ' + ips.length + ' bytes. Patched ROM CRC32 ' + crcOut + '.', 'ok');
+};
+})();
+</script>
